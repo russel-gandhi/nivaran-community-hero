@@ -185,8 +185,8 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
     return () => navigator.geolocation.clearWatch(watchId);
   }, [currentUserProfile]);
 
-  // Filter public reports
-  const publicReports = reports.filter(r => r.tier === 'public');
+  // Filter public reports that are active
+  const publicReports = reports.filter(r => r.tier === 'public' && r.status !== 'resolved');
 
   const filteredReports = publicReports.filter(r => {
     const catMatch = selectedCategory === 'all' || r.categoryId === selectedCategory;

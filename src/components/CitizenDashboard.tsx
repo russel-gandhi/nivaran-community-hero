@@ -10,16 +10,13 @@ interface CitizenDashboardProps {
 }
 
 export default function CitizenDashboard({ reports, currentUserProfile, onOpenReportWizard, onVote }: CitizenDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'my_reports' | 'verify_nearby'>('my_reports');
+  const [activeTab, setActiveTab] = useState<'my_reports' | 'verify_nearby' | 'history'>('my_reports');
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'photo' | 'video' | 'audio'; title: string; description: string } | null>(null);
 
-  // Filter current user's reports
-  const myReports = reports.filter(r => r.reporterId === currentUserProfile?.id);
+  // Filter current user's active reports
+  const myReports = reports.filter(r => r.reporterId === currentUserProfile?.id && r.status !== 'resolved');
 
-  // Filter nearby reports that current user can verify:
-  // - Must be common_area of same building OR public street
-  // - Must be OPEN or IN PROGRESS
-  // - Must NOT be reported by the current user themselves
+  // Filter nearby active reports
   const nearbyReports = reports.filter(r => {
     if (r.reporterId === currentUserProfile?.id) return false;
     if (r.status === 'resolved') return false;
@@ -29,6 +26,18 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
 
     return false;
   });
+
+  // History reports for current user
+  const historyPrivateBuilding = reports.filter(r => 
+    r.status === 'resolved' && 
+    (r.tier === 'flat' || r.tier === 'common_area') && 
+    (r.reporterId === currentUserProfile?.id || r.buildingId === currentUserProfile?.registeredBuildingId)
+  );
+  
+  const historyPublic = reports.filter(r => 
+    r.status === 'resolved' && 
+    r.tier === 'public'
+  );
 
   const getSeverityBadgeColor = (sev: number) => {
     if (sev >= 5) return 'bg-red-50 text-red-700 border-red-100';
@@ -86,6 +95,15 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
           id="tab-verify-nearby"
         >
           Verify Nearby ({nearbyReports.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex-1 text-center py-3 text-xs font-extrabold transition-all border-b-2 ${
+            activeTab === 'history' ? 'border-orange-500 text-orange-500 font-black' : 'border-transparent text-slate-400'
+          }`}
+          id="tab-history"
+        >
+          History ({historyPrivateBuilding.length + historyPublic.length})
         </button>
       </div>
 
@@ -293,6 +311,72 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
           )}
         </div>
       )}
+
+      {/* Tab 3: History */}
+      {activeTab === 'history' && (
+        <div className="space-y-6" id="history-list">
+          {historyPrivateBuilding.length === 0 && historyPublic.length === 0 ? (
+            <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 p-6">
+              <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs font-bold text-slate-600">No resolved issues yet</p>
+              <p className="text-[11px] text-slate-400 mt-1">Issues will appear here once they are marked as fixed.</p>
+            </div>
+          ) : (
+            <>
+              {historyPrivateBuilding.length > 0 && (
+                <div className="space-y-3.5">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">Private & Building</h4>
+                  {historyPrivateBuilding.map((report) => (
+                    <div key={report.id} className="bg-slate-50 rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3 opacity-80" id={`history-report-${report.id}`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${getSeverityBadgeColor(report.severity)}`}>
+                              {report.categoryName}
+                            </span>
+                            <span className="text-[10px] text-slate-400">•</span>
+                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider">
+                              {report.tier.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-700 mt-2 line-through decoration-slate-400">{report.subtag}</h4>
+                        </div>
+                        {getStatusBadge(report.status)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {historyPublic.length > 0 && (
+                <div className="space-y-3.5 mt-6">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">Public Issues</h4>
+                  {historyPublic.map((report) => (
+                    <div key={report.id} className="bg-slate-50 rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3 opacity-80" id={`history-report-${report.id}`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${getSeverityBadgeColor(report.severity)}`}>
+                              {report.categoryName}
+                            </span>
+                            <span className="text-[10px] text-slate-400">•</span>
+                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider">
+                              {report.tier.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-700 mt-2 line-through decoration-slate-400">{report.subtag}</h4>
+                        </div>
+                        {getStatusBadge(report.status)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Media Lightbox Modal */}
       {selectedMedia && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">

@@ -19,7 +19,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'photo' | 'video' | 'audio'; title: string; description: string } | null>(null);
 
   // Admissions and vetting states
-  const [activeManagerTab, setActiveManagerTab] = useState<'grievances' | 'admissions'>('grievances');
+  const [activeManagerTab, setActiveManagerTab] = useState<'grievances' | 'admissions' | 'history'>('grievances');
   const [residents, setResidents] = useState<UserProfile[]>([]);
   const [residentsLoading, setResidentsLoading] = useState(false);
 
@@ -244,7 +244,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           }`}
           id="tab-manager-grievances"
         >
-          Grievances Queue ({reports.length})
+          Grievances Queue ({reports.filter(r => r.status !== 'resolved').length})
         </button>
         <button
           onClick={() => setActiveManagerTab('admissions')}
@@ -261,6 +261,17 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
               {residents.filter(r => r.approvalStatus === 'pending').length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveManagerTab('history')}
+          className={`flex-1 py-2.5 text-xs font-bold transition-all text-center border-b-2 ${
+            activeManagerTab === 'history'
+              ? 'border-orange-500 text-orange-600 font-extrabold'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+          id="tab-manager-history"
+        >
+          History ({reports.filter(r => r.status === 'resolved').length})
         </button>
       </div>
 
@@ -286,7 +297,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           {/* Ticket List */}
           <div className="space-y-3" id="manager-tickets-list">
             <div className="flex justify-between items-center px-1">
-              <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({reports.length})</h4>
+              <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({reports.filter(r => r.status !== 'resolved').length})</h4>
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
@@ -336,14 +347,14 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                 <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 <p className="text-xs text-slate-400 mt-2 font-medium">Fetching active complaints...</p>
               </div>
-            ) : reports.length === 0 ? (
+            ) : reports.filter(r => r.status !== 'resolved').length === 0 ? (
               <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 p-6">
                 <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                 <p className="text-xs font-bold text-slate-600">Property complaints queue is empty</p>
                 <p className="text-[11px] text-slate-400 mt-1">Excellent! No flat or common-area hazards remain.</p>
               </div>
             ) : (
-              reports.map((report) => (
+              reports.filter(r => r.status !== 'resolved').map((report) => (
                 <div key={report.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3" id={`manager-ticket-${report.id}`}>
                   <div className="flex justify-between items-start">
                     <div>
@@ -621,6 +632,81 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           </div>
         </div>
       )}
+
+      {/* HISTORY TAB PANEL */}
+      {activeManagerTab === 'history' && (
+        <div className="space-y-4" id="manager-history-panel">
+          <div className="flex justify-between items-center px-1">
+            <h4 className="text-sm font-bold text-slate-800">Resolved Grievances ({reports.filter(r => r.status === 'resolved').length})</h4>
+          </div>
+
+          {reports.filter(r => r.status === 'resolved').length === 0 ? (
+            <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 p-6">
+              <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs font-bold text-slate-600">No resolved issues yet</p>
+              <p className="text-[11px] text-slate-400 mt-1">Issues will appear here once they are marked as fixed.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reports.filter(r => r.status === 'resolved').map((report) => (
+                <div key={report.id} className="bg-slate-50 rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3 opacity-80" id={`manager-history-${report.id}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          report.tier === 'flat' ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {report.tier === 'flat' ? 'Private Flat' : 'Common Area'}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">•</span>
+                        <span className="text-xs font-bold text-slate-600">{report.categoryName}</span>
+                      </div>
+                      <h5 className="text-sm font-bold text-slate-700 mt-1.5 line-through decoration-slate-400">{report.subtag}</h5>
+                    </div>
+                    <span className="text-[10px] font-black text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Resolved
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {report.evidenceUrl && (
+                      <div 
+                        onClick={() => {
+                          setSelectedMedia({
+                            url: report.evidenceUrl!,
+                            type: report.evidenceType || 'photo',
+                            title: report.subtag,
+                            description: report.description || ''
+                          });
+                        }}
+                        className="col-span-1 rounded-xl overflow-hidden border border-slate-200 h-20 bg-slate-100 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all relative group"
+                      >
+                        {report.evidenceType === 'audio' ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-orange-50 text-orange-600">
+                            <span className="text-[8px] font-bold mt-1">Play Noise</span>
+                          </div>
+                        ) : report.evidenceType === 'video' ? (
+                          <div className="relative w-full h-full bg-slate-900 flex items-center justify-center">
+                            <video src={report.evidenceUrl} className="w-full h-full object-cover opacity-75" />
+                            <Play className="w-5 h-5 text-white absolute" />
+                          </div>
+                        ) : (
+                          <img src={report.evidenceUrl} alt="Issue Evidence" className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                    )}
+                    <div className="col-span-2 space-y-1">
+                      <p className="text-xs text-slate-500 line-clamp-2 italic">"{report.description || 'No description provided.'}"</p>
+                      <p className="text-[10px] text-slate-400">Reported by {report.reporterName} • {new Date(report.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Media Lightbox Modal */}
       {selectedMedia && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
