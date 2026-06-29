@@ -1,0 +1,373 @@
+import express from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI } from '@google/genai';
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const PORT = 3000;
+
+// Set up larger limit for base64 uploads (photos/audio)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Check if Gemini API Key is present
+const geminiApiKey = process.env.GEMINI_API_KEY;
+if (!geminiApiKey) {
+  console.warn('⚠️ GEMINI_API_KEY environment variable is not defined! AI features will fail.');
+}
+
+const ai = new GoogleGenAI({ apiKey: geminiApiKey || 'DUMMY_KEY' });
+
+// Help parse base64 data URLs
+function parseBase64DataUrl(dataUrl: string) {
+  if (!dataUrl) return null;
+  const matches = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+  if (matches && matches.length === 3) {
+    return {
+      mimeType: matches[1],
+      data: matches[2]
+    };
+  }
+  return null;
+}
+
+// 1. Out-of-Scope and Emergency Check (Step 3)
+app.post('/api/check-scope', async (req, res) => {
+  try {
+    const { description } = req.body;
+    if (!description || description.trim() === '') {
+      return res.json({ status: 'valid' });
+    }
+
+    // Safety bypass: urgent keyword check
+    const lowerDesc = description.toLowerCase();
+    const urgentKeywords = [
+      'fire', 'crime', 'murder', 'police', 'ambulance', 'heart attack', 'emergency', 'dying', 'suicide', 'kill',
+      'bleeding', 'accident', 'theft', 'robbery', 'hostage', 'abuse', 'ongoing assault', 'assault'
+    ];
+    
+    const hasUrgentKeyword = urgentKeywords.some(keyword => {
+      // Basic boundary check
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      return regex.test(lowerDesc);
+    });
+
+    if (hasUrgentKeyword) {
+      return res.json({
+        status: 'emergency',
+        redirect: 'This sounds urgent. Please contact 112 right away.'
+      });
+    }
+
+    // Call Gemini to classify safety and scope
+    const prompt = `You are a triage classifier for "Nivaran", a hyperlocal civic and building issue resolver app.
+Analyze the user's report description and decide if it falls into one of these categories:
+1. EMERGENCY: Suggests fire, an ongoing crime, a medical emergency, active physical danger, or a personal crisis.
+2. OUT_OF_SCOPE: About an individual driver or vehicle's behavior, a personal dispute with a neighbor, a landlord/billing dispute, naming/defaming a specific individual, political content, or a general informational question.
+3. VALID: Any legitimate building/civic issue (e.g. leaking plumbing, broken streetlights, broken lift, potholes, garbage, water drainage, construction noise, etc.).
+
+Your output must be strictly JSON format conforming to this typescript interface:
+{
+  status: 'emergency' | 'out_of_scope' | 'valid',
+  redirectMessage?: string // A short polite message indicating who to contact or why it was bounced
+}
+
+User description: "${description}"
+
+Ensure you return ONLY JSON. No markdown wrappers except possibly \`\`\`json.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const responseText = response.text || '{}';
+    // Clean markdown if any
+    const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const result = JSON.parse(cleanText);
+
+    if (result.status === 'emergency') {
+      return res.json({
+        status: 'emergency',
+        redirect: result.redirectMessage || 'This sounds urgent. Please contact 112 right away.'
+      });
+    } else if (result.status === 'out_of_scope') {
+      return res.json({
+        status: 'out_of_scope',
+        redirect: result.redirectMessage || 'For this type of issue, please contact local traffic police or relevant private parties.'
+      });
+    }
+
+    return res.json({ status: 'valid' });
+  } catch (error: any) {
+    console.warn('Check-scope API fallback triggered due to AI error:', error.message || error);
+    // Graceful fallback to valid if Gemini fails to keep user flow going, or do a strict check
+    res.json({ status: 'valid' });
+  }
+});
+
+// 2. Multimodal Verification Agent (Step 5)
+app.post('/api/verify-evidence', async (req, res) => {
+  try {
+    const { category, subtag, description, evidenceUrl, evidenceType } = req.body;
+
+    if (!evidenceUrl) {
+      return res.status(400).json({ error: 'Evidence URL/base64 is required.' });
+    }
+
+    const parsedEvidence = parseBase64DataUrl(evidenceUrl);
+    if (!parsedEvidence) {
+      return res.status(400).json({ error: 'Invalid evidence format (must be base64 data URL).' });
+    }
+
+    const contents: any[] = [];
+    
+    // Add textual context
+    let textPrompt = '';
+    const isSimulated = parsedEvidence.data === 'UklGRi4AAABXQVZFRm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=' || parsedEvidence.data.length < 100;
+
+    if (evidenceType === 'audio' || parsedEvidence.mimeType.startsWith('audio/')) {
+      textPrompt = `You are a professional acoustic forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+The citizen has submitted a noise grievance under:
+- Category: "${category}"
+- Subtag: "${subtag}"
+- Description: "${description || 'No description provided.'}"
+
+${isSimulated ? `⚠️ METADATA NOTE: This is a simulated/dummy audio sample. Since this is an interactive simulation, you must perform a simulated acoustic review of the sound described in the user's description.
+- If their description mentions real noise nuisances (e.g., active drilling, hammering, loud construction, grinding machinery), accept the claim, simulating that you detected these specific frequency and amplitude peaks in the audio file.
+- If their description mentions typical quiet room backgrounds, complete silence, or faint domestic sounds (e.g., "very quiet", "just standard ticking of my clock", "faint fan hum"), reject the claim.
+- Explicitly state in your reasoning that you conducted a simulated acoustic analysis on the described soundscape.` : ''}
+
+CRITICAL ACOUSTIC VERIFICATION PROTOCOLS:
+1. DETECTED SOUND CLASSIFICATION:
+   - "NORMAL ROOM BACKGROUND NOISE": This includes complete silence, quiet breathing, faint breeze, domestic fan/AC whirring, distant ticking of a clock, soft page-turning, light keyboard typing, or occasional shuffling. These are ordinary, non-actionable sounds of human habitation and MUST NOT be accepted as grievances.
+   - "ACTIVE CONSTRUCTION / NUISANCE NOISE": Heavy machinery, concrete drill, hammer impacts, electric circular saw, stone/tile grinding, metal clanging, loud generator hums, shouting, loud high-bass music, or persistent thumping.
+
+2. LOGICAL RULESET FOR DETERMINATION:
+   - If the audio contains ONLY Normal Room Background Noise but the citizen claims there is construction drilling, grinding, or hammering:
+     * Set "is_valid_issue" to false.
+     * Set "confidence" to 90-100%.
+     * Set "rejection_reason" to: "Our acoustic validation detected only ambient room silence or normal domestic sounds (e.g., quiet room hum, light whispering). No active drilling, hammering, or construction noises were present in the recording. Please record again when the noise nuisance is actively occurring."
+     * Keep severity_hint at 1.
+   - If the audio contains distinct, audible Active Construction / Nuisance Noise aligning with the citizen's description:
+     * Set "is_valid_issue" to true.
+     * Set "confidence" to 85-100% depending on clarity.
+     * Set "detected_subtag" to the subtag. If the subtag is slightly mismatched (e.g., they claimed "Drilling" but you hear "Loud Music"), auto-correct the "detected_subtag" to the correct noise subtag.
+     * Set "rejection_reason" to null.
+     * Select "severity_hint" from 1 to 5 (e.g., continuous drilling/sawing = 4 or 5, occasional banging = 2 or 3).
+
+OUTPUT FORMAT SPECIFICATION:
+You must respond with raw JSON matching this TypeScript structure:
+{
+  "is_valid_issue": boolean,
+  "confidence": number, // integer 0-100
+  "detected_subtag": "string", // name of aligned subtag
+  "severity_hint": number, // 1 to 5
+  "reasoning": "Provide an extremely rigorous, acoustic analysis breakdown including: 1) Estimated Acoustic Profile (continuous vs transient, low/high frequency range), 2) Signal-to-Noise evaluation compared to standard ambient baselines, and 3) Aligned context verification. Summarize it always in less than 100 words.",
+  "rejection_reason": "string describing why it was rejected, or null if accepted"
+}
+
+Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+    } else if (evidenceType === 'video' || parsedEvidence.mimeType.startsWith('video/')) {
+      textPrompt = `You are a professional video forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+The citizen has submitted video evidence under:
+- Category: "${category}"
+- Subtag: "${subtag}"
+- Description: "${description || 'No description provided.'}"
+
+CRITICAL VIDEO VERIFICATION PROTOCOLS:
+1. DETECTED VISUAL FAILURE CLASSIFICATION:
+   - "DYNAMIC FAILURES / HAZARDS": Moving elements, active running/spraying water, flickering electrical sparks, malfunctioning elevator doors, active traffic congestion, people carrying out unauthorized activities, or active structural degradation.
+   - "STATIC HAZARDS": Severe physical degradation, structural cracks, broken fixtures, overflowing waste containers.
+   - "FRAUDULENT / SPAM EVIDENCE": Completely dark/blank screen, a simple selfie, photos of family pets, random scenery (like a nice garden or sky), general internet memes, or an entirely clean room or floor with no issues.
+
+2. LOGICAL RULESET FOR DETERMINATION:
+   - If the video shows zero visual failure, is completely black, blank, blurred, or shows unrelated subjects (such as a selfie or a pet):
+     * Set "is_valid_issue" to false.
+     * Set "confidence" to 95-100%.
+     * Set "rejection_reason" to: "The video evidence provided does not contain any visible hazard, structural failure, or civic issue matching the report. It appears to be a blank screen, selfie, or unrelated capture. Please capture a clear video clip showing the active issue."
+     * Keep severity_hint at 1.
+   - If the video shows a real issue but the category/subtag is slightly mismatched (e.g., reported "road pothole" but video shows "overflowing sewage"):
+     * Set "is_valid_issue" to true.
+     * Set "confidence" to 80-100%.
+     * Set "detected_subtag" to the aligned correct subtag.
+     * Set "rejection_reason" to null.
+     * Select "severity_hint" from 1 to 5 (e.g., active water flooding = 4 or 5, minor flickering = 2).
+   - If the video accurately captures the reported issue:
+     * Set "is_valid_issue" to true.
+     * Set "confidence" to 85-100%.
+     * Set "detected_subtag" to the original subtag.
+     * Set "rejection_reason" to null.
+     * Set "severity_hint" from 1 to 5 based on the visual magnitude of the hazard.
+
+OUTPUT FORMAT SPECIFICATION:
+You must respond with raw JSON matching this TypeScript structure:
+{
+  "is_valid_issue": boolean,
+  "confidence": number, // integer 0-100
+  "detected_subtag": "string",
+  "severity_hint": number, // 1 to 5
+  "reasoning": "Provide an extremely rigorous, visual analysis breakdown including: 1) Dynamic/Static Elements Observed, 2) Environmental & Spatial Background match (such as street, corridor, plumbing duct), and 3) Verification of authentic grievance indicators. Summarize it always in less than 100 words.",
+  "rejection_reason": "string describing why it was rejected, or null if accepted"
+}
+
+Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+    } else {
+      textPrompt = `You are a professional visual inspector and forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+The citizen has submitted photo evidence under:
+- Category: "${category}"
+- Subtag: "${subtag}"
+- Description: "${description || 'No description provided.'}"
+
+CRITICAL PHOTO VERIFICATION PROTOCOLS:
+1. DETECTED PHOTO FAILURE CLASSIFICATION:
+   - "LEGITIMATE CIVIL/BUILDING ISSUES": Potholes, asphalt damage, water seepage, wet damp patches, mold, peeling plaster, structural cracks, broken wiring, rusted light poles, leaking plumbing fixtures, overflowing trash dumps.
+   - "FRAUDULENT / SPAM / UNRELATED": Selfies, domestic animals/pets, internet memes, general landscape photos, clean/well-maintained walls or floors with zero defects, or completely blurry/out-of-focus pictures where nothing is identifiable.
+
+2. LOGICAL RULESET FOR DETERMINATION:
+   - If the photo shows no visible issue, or is completely unrelated, blurry, or spam:
+     * Set "is_valid_issue" to false.
+     * Set "confidence" to 95-100%.
+     * Set "rejection_reason" to: "The photo evidence provided does not contain any visible structural damage, civil hazard, or municipal failure matching the description. Please upload a clear, focused photo showing the issue clearly."
+     * Keep severity_hint at 1.
+   - If the photo shows a real civic/structural issue but under a different subtag (e.g., reported "peeling paint" but photo shows a "deep structural beam crack"):
+     * Set "is_valid_issue" to true.
+     * Set "confidence" to 80-100%.
+     * Set "detected_subtag" to the correct matching subtag to auto-align the report.
+     * Set "rejection_reason" to null.
+     * Set "severity_hint" from 1 to 5 based on risk.
+   - If the photo perfectly substantiates the reported issue:
+     * Set "is_valid_issue" to true.
+     * Set "confidence" to 85-100%.
+     * Set "detected_subtag" to the original subtag.
+     * Set "rejection_reason" to null.
+     * Set "severity_hint" from 1 to 5 (e.g., major wall seepage with structural damage = 4 or 5, minor peeling paint = 1 or 2).
+
+OUTPUT FORMAT SPECIFICATION:
+You must respond with raw JSON matching this TypeScript structure:
+{
+  "is_valid_issue": boolean,
+  "confidence": number, // integer 0-100
+  "detected_subtag": "string",
+  "severity_hint": number, // 1 to 5
+  "reasoning": "Provide an extremely rigorous, visual inspection analysis breakdown including: 1) Structural & Damage indicators observed, 2) Hazard scale and impact estimation, and 3) Aligned subtag confirmation. Summarize it always in less than 100 words.",
+  "rejection_reason": "string describing why it was rejected, or null if accepted"
+}
+
+Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+    }
+
+    const contentsParts = [
+      { text: textPrompt },
+      {
+        inlineData: {
+          data: parsedEvidence.data,
+          mimeType: parsedEvidence.mimeType
+        }
+      }
+    ];
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: contentsParts },
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const responseText = response.text || '{}';
+    const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const result = JSON.parse(cleanText);
+
+    return res.json(result);
+  } catch (error: any) {
+    console.warn('Error in verify-evidence API:', error.message || error);
+    // Return a structured error response
+    res.status(500).json({
+      is_valid_issue: true, // Fail-open for demo if Gemini fails completely
+      confidence: 80,
+      detected_subtag: req.body.subtag,
+      severity_hint: 3,
+      reasoning: 'Server-side verification bypassed due to configuration error, accepted automatically for demo purposes.',
+      rejection_reason: null
+    });
+  }
+});
+
+// 3. Routing Agent (Step 8)
+app.post('/api/route-report', (req, res) => {
+  const { categoryId, categoryName, subtag, tier } = req.body;
+
+  const referenceId = 'NIV-' + Math.floor(100000 + Math.random() * 900000);
+
+  if (tier === 'flat' || tier === 'common_area') {
+    return res.json({
+      routedTo: 'building_manager',
+      referenceId,
+      deptName: 'Building Management Office',
+      message: 'Ticket successfully created and routed to Building Management.'
+    });
+  }
+
+  // Public street routing map
+  let deptName = 'General Civic Grievance Cell';
+  const cat = (categoryName || '').toLowerCase();
+
+  if (cat.includes('road')) {
+    deptName = 'Public Works Department (PWD)';
+  } else if (cat.includes('streetlight') || cat.includes('electrical')) {
+    deptName = 'Municipal Electricity & Lighting Board';
+  } else if (cat.includes('garbage') || cat.includes('waste')) {
+    deptName = 'Sanitation & Solid Waste Management Dept';
+  } else if (cat.includes('water') || cat.includes('drainage')) {
+    deptName = 'Water Supply & Sewerage Board';
+  } else if (cat.includes('construction') || cat.includes('nuisance')) {
+    deptName = 'Urban Pollution & Environmental Control Division';
+  } else if (cat.includes('junction') || cat.includes('unsafe')) {
+    deptName = 'Traffic Engineering & Road Safety Department';
+  } else if (cat.includes('stray') || cat.includes('animal')) {
+    deptName = 'Animal Welfare Board & Veterinary Services Division';
+  }
+
+  return res.json({
+    routedTo: 'government_dept',
+    referenceId,
+    deptName,
+    message: `Civic issue automatically routed and formal complaint filed with simulated department: ${deptName}.`
+  });
+});
+
+// Start Express server and integrate Vite middleware
+async function startServer() {
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+    console.log('Vite development server loaded as middleware');
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    // SPA fallback
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Nivaran Server running on http://localhost:${PORT} (Production: ${process.env.NODE_ENV === 'production'})`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+});

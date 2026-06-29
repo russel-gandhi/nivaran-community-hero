@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "Building": {
+      "title": "Building",
+      "description": "Represents a residential building or property managed by a property manager.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "managerUserId": { "type": "string" },
+        "managerEmail": { "type": "string" }
+      },
+      "required": ["id", "name", "address", "lat", "lng", "managerUserId", "managerEmail"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Taxonomy category for grievance reports (e.g. Plumbing, Security, Common area maintenance).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tier": { "type": "string", "enum": ["flat", "common_area", "public"] }
+      },
+      "required": ["id", "name", "tier"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Information about a resident or manager citizen profile.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "registeredBuildingId": { "type": "string" },
+        "points": { "type": "integer" },
+        "badges": { "type": "array" }
+      },
+      "required": ["id", "name", "email", "points"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A citizen grievance report with text details, status, and optional image/audio evidence.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "subtag": { "type": "string" },
+        "tier": { "type": "string", "enum": ["flat", "common_area", "public"] },
+        "buildingId": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "evidenceUrl": { "type": "string" },
+        "evidenceType": { "type": "string", "enum": ["image", "audio", "none"] },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "address": { "type": "string" },
+        "upvotes": { "type": "integer" },
+        "upvoters": { "type": "array" },
+        "managerNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "description", "categoryId", "categoryName", "subtag", "tier", "reporterId", "status", "evidenceType", "upvotes", "upvoters", "createdAt"]
+    },
+    "RoutingLog": {
+      "title": "RoutingLog",
+      "description": "Log of departmental routing of reports.",
+      "type": "object",
+      "properties": {
+        "reportId": { "type": "string" },
+        "routedTo": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "deptName": { "type": "string" }
+      },
+      "required": ["reportId", "routedTo", "sentAt"]
+    }
+  },
+  "firestore": {
+    "buildings/{buildingId}": {
+      "schema": { "$ref": "#/entities/Building" },
+      "description": "Collection of buildings/societies."
+    },
+    "categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Collection of categories."
+    },
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile collection."
+    },
+    "reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Grievance reports created by citizens."
+    },
+    "routing_log/{logId}": {
+      "schema": { "$ref": "#/entities/RoutingLog" },
+      "description": "Routing log of grievance reports."
+    }
+  }
+}
