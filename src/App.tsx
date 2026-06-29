@@ -17,6 +17,7 @@ export default function App() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(() => {
     return localStorage.getItem('nivaran_session_user_id') || null;
   });
+  const [accessTokenState, setAccessTokenState] = useState<string | null>(null);
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -281,16 +282,18 @@ export default function App() {
   const handleGoogleLogin = async (role: 'citizen' | 'manager' = 'citizen') => {
     try {
       const provider = new GoogleAuthProvider();
-      // Add scopes for Google Drive Picker and Gmail
-      provider.addScope('https://www.googleapis.com/auth/drive.file');
-      provider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
-      provider.addScope('https://www.googleapis.com/auth/gmail.send');
+      // Only request sensitive scopes if logging in as manager
+      if (role === 'manager') {
+        provider.addScope('https://www.googleapis.com/auth/gmail.send');
+      }
+      
       // Force account selection to allow easily switching accounts during testing
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         setAccessToken(credential.accessToken);
+        setAccessTokenState(credential.accessToken);
       }
       setCurrentRole(role);
     } catch (err) {
@@ -321,6 +324,7 @@ export default function App() {
       await signOut(auth);
       localStorage.removeItem('nivaran_session_user_id');
       setAccessToken(null);
+      setAccessTokenState(null);
       setCurrentUserProfile(null);
       setSessionUserId(null);
       setCurrentRole('citizen');
@@ -963,7 +967,7 @@ export default function App() {
               currentBuildingId={managerBuildingId}
               onBuildingChanged={setManagerBuildingId}
               currentUserProfile={currentUserProfile}
-              accessToken={accessToken}
+              accessToken={accessTokenState}
             />
           ) : currentRole === 'anonymous' ? (
             <div className="space-y-4" id="public-map-wrapper">
