@@ -7,9 +7,10 @@ import CitizenDashboard from './components/CitizenDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import PublicMap from './components/PublicMap';
 import LeaderboardView from './components/LeaderboardView';
+import DonationView from './components/DonationView';
 import ReportIssueWizard from './components/ReportIssueWizard';
 import ResolutionWizard from './components/ResolutionWizard';
-import { Trophy, Map as MapIcon, LayoutGrid, Building2, User2, ShieldCheck, Sparkles, RefreshCw, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
+import { Trophy, Map as MapIcon, LayoutGrid, Building2, User2, ShieldCheck, Sparkles, RefreshCw, ChevronRight, CheckCircle, XCircle, Heart } from 'lucide-react';
 import { setAccessToken } from './lib/auth';
 import BuildingAutocomplete from './components/BuildingAutocomplete';
 
@@ -42,7 +43,7 @@ export default function App() {
 
   // Navigation & Role states
   const [currentRole, setCurrentRole] = useState<'citizen' | 'manager' | 'anonymous'>('citizen');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'map' | 'leaderboard'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'map' | 'leaderboard' | 'donate'>('dashboard');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1193,6 +1194,11 @@ export default function App() {
                   allProfiles={allProfiles}
                 />
               )}
+
+              {/* TAB 4: DONATE */}
+              {activeTab === 'donate' && (
+                <DonationView />
+              )}
             </>
           )}
         </main>
@@ -1231,6 +1237,17 @@ export default function App() {
             >
               <Trophy className="w-5 h-5" />
               <span className="text-[9px] font-bold">Leaderboard</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('donate')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 transition-colors ${
+                activeTab === 'donate' ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'
+              }`}
+              id="nav-donate"
+            >
+              <Heart className="w-5 h-5" />
+              <span className="text-[9px] font-bold">Donate</span>
             </button>
           </nav>
         )}
