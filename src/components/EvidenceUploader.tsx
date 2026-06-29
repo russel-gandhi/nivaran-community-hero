@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Trash2, CheckCircle2, Sparkles, Video, StopCircle, RefreshCw, AlertCircle, Play, Cloud } from 'lucide-react';
 import { getAccessToken } from '../lib/auth';
+import exifr from 'exifr';
 
 interface EvidenceUploaderProps {
   evidenceType: 'photo' | 'video' | 'audio';
-  onEvidenceCaptured: (base64Url: string) => void;
+  onEvidenceCaptured: (base64Url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }) => void;
 }
 
 // Interactive Indian Civic Issue Presets for Easy Demo Testing
@@ -71,13 +72,30 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
   }, [stream]);
 
   // Convert File to Base64
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file) return;
+    
+    let extractedMetadata: { lat?: number; lng?: number; timestamp?: number } | undefined;
+    if (evidenceType === 'photo') {
+      try {
+        const metadata = await exifr.parse(file);
+        if (metadata) {
+          extractedMetadata = {
+            lat: metadata.latitude,
+            lng: metadata.longitude,
+            timestamp: metadata.DateTimeOriginal?.getTime()
+          };
+        }
+      } catch (err) {
+        console.warn('Failed to extract EXIF data:', err);
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
       setSelectedEvidence(base64);
-      onEvidenceCaptured(base64);
+      onEvidenceCaptured(base64, extractedMetadata);
     };
     reader.readAsDataURL(file);
   };
@@ -156,11 +174,28 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
         throw new Error('Failed to download file from Google Drive');
       }
       const blob = await res.blob();
+      
+      let extractedMetadata: { lat?: number; lng?: number; timestamp?: number } | undefined;
+      if (evidenceType === 'photo') {
+        try {
+          const metadata = await exifr.parse(blob);
+          if (metadata) {
+            extractedMetadata = {
+              lat: metadata.latitude,
+              lng: metadata.longitude,
+              timestamp: metadata.DateTimeOriginal?.getTime()
+            };
+          }
+        } catch (err) {
+          console.warn('Failed to extract EXIF data from Drive blob:', err);
+        }
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         setSelectedEvidence(base64);
-        onEvidenceCaptured(base64);
+        onEvidenceCaptured(base64, extractedMetadata);
       };
       reader.readAsDataURL(blob);
     } catch (err) {

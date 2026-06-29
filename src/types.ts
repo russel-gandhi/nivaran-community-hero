@@ -48,6 +48,7 @@ export interface Report {
   severity: number; // 1-5
   confidence: number; // 0-100
   createdAt: string;
+  lowMetadataConfidence?: boolean;
   verifiedAt?: string;
   confirmationsCount: number;
   reasoning?: string;

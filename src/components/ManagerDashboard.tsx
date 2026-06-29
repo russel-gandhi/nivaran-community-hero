@@ -463,6 +463,12 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                       <p className="text-[10px] text-slate-400 font-bold">
                         By Resident: {report.reporterName}
                       </p>
+                      {report.lowMetadataConfidence && (
+                        <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>Low Metadata Confidence: Missing or unmatched GPS/Time EXIF data.</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -711,6 +717,12 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                     <div className="col-span-2 space-y-1">
                       <p className="text-xs text-slate-500 line-clamp-2 italic">"{report.description || 'No description provided.'}"</p>
                       <p className="text-[10px] text-slate-400">Reported by {report.reporterName} • {new Date(report.createdAt).toLocaleDateString()}</p>
+                      {report.lowMetadataConfidence && (
+                        <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>Low Metadata Confidence</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

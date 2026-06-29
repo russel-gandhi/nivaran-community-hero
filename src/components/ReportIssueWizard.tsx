@@ -24,6 +24,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   const [categorySearch, setCategorySearch] = useState('');
   const [description, setDescription] = useState('');
   const [evidenceUrl, setEvidenceUrl] = useState<string>('');
+  const [evidenceMetadata, setEvidenceMetadata] = useState<{ lat?: number; lng?: number; timestamp?: number } | undefined>();
   const [evidenceType, setEvidenceType] = useState<'photo' | 'video' | 'audio'>('photo');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -149,8 +150,13 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   };
 
   // Step 4 -> Step 5 (Verification Agent)
-  const handleEvidenceCaptured = (url: string) => {
+  const handleEvidenceCaptured = (url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }) => {
     setEvidenceUrl(url);
+    if (metadata) {
+      setEvidenceMetadata(metadata);
+    } else {
+      setEvidenceMetadata(undefined);
+    }
   };
 
   const runVerificationAgent = async () => {
@@ -327,6 +333,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
       }
 
       // Write report to Firestore
+      const hasMetadataCoords = evidenceMetadata?.lat !== undefined && evidenceMetadata?.lng !== undefined;
       const newReport: Omit<Report, 'id'> = {
         reporterId: currentUserProfile?.id || 'anonymous',
         reporterName: currentUserProfile?.name || 'Anonymous Citizen',
@@ -345,7 +352,10 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         createdAt: new Date().toISOString(),
         confirmationsCount: 1,
         reasoning: verificationResult?.reasoning || 'Automatically ingested.',
-        votedUserIds: [currentUserProfile?.id || 'anonymous']
+        votedUserIds: [currentUserProfile?.id || 'anonymous'],
+        lowMetadataConfidence: !hasMetadataCoords,
+        lat: evidenceMetadata?.lat,
+        lng: evidenceMetadata?.lng
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {
