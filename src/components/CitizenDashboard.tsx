@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Report, UserProfile } from '../types';
-import { PlusCircle, Clock, CheckCircle2, ShieldAlert, Award, ThumbsUp, ThumbsDown, FileText, Sparkles, MapPin, X, Play, Pause } from 'lucide-react';
+import { PlusCircle, Clock, CheckCircle2, ShieldAlert, Award, ThumbsUp, ThumbsDown, FileText, Sparkles, MapPin, X, Play, Pause, AlertTriangle } from 'lucide-react';
 
 interface CitizenDashboardProps {
   reports: Report[];
@@ -48,10 +48,12 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
     return 'bg-yellow-50 text-yellow-800 border-yellow-100';
   };
 
-  const getStatusBadge = (status: 'open' | 'in_progress' | 'resolved' | 'retracted') => {
+  const getStatusBadge = (status: 'open' | 'in_progress' | 'resolved' | 'retracted' | 'reopened') => {
     switch (status) {
       case 'resolved':
         return <span className="text-[10px] font-black text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-md flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Resolved</span>;
+      case 'reopened':
+        return <span className="text-[10px] font-black text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Reopened</span>;
       case 'in_progress':
         return <span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md flex items-center gap-1"><Clock className="w-3 h-3" /> In Progress</span>;
       case 'retracted':
@@ -59,6 +61,14 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
       default:
         return <span className="text-[10px] font-black text-orange-700 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-md flex items-center gap-1"><Clock className="w-3 h-3" /> Open</span>;
     }
+  };
+
+  const isWithinReopenWindow = (resolvedAt?: string) => {
+    if (!resolvedAt) return true; // fallback
+    const resolvedDate = new Date(resolvedAt).getTime();
+    const now = Date.now();
+    // 7 days window
+    return (now - resolvedDate) < 7 * 24 * 60 * 60 * 1000;
   };
 
   return (
@@ -405,12 +415,22 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                               </button>
                             </div>
                           ) : (
-                            <button 
-                              onClick={() => setConfirmRetractId(report.id)}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
-                            >
-                              Retract my report
-                            </button>
+                            <div className="flex gap-2 items-center">
+                              {report.status === 'resolved' && isWithinReopenWindow(report.resolvedAt) && (
+                                <button 
+                                  onClick={() => onVote(report.id, 'still_broken')}
+                                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 hover:underline px-2 py-1"
+                                >
+                                  Still broken? Reopen
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => setConfirmRetractId(report.id)}
+                                className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                              >
+                                Retract my report
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
@@ -462,12 +482,22 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                               </button>
                             </div>
                           ) : (
-                            <button 
-                              onClick={() => setConfirmRetractId(report.id)}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
-                            >
-                              Retract my report
-                            </button>
+                            <div className="flex gap-2 items-center">
+                              {report.status === 'resolved' && isWithinReopenWindow(report.resolvedAt) && (
+                                <button 
+                                  onClick={() => onVote(report.id, 'still_broken')}
+                                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 hover:underline px-2 py-1"
+                                >
+                                  Still broken? Reopen
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => setConfirmRetractId(report.id)}
+                                className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                              >
+                                Retract my report
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}

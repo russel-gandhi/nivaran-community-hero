@@ -440,19 +440,58 @@ export default function App() {
       const recurrenceBump = Math.min(2, Math.floor((confirmations - 1) / 3));
       const finalSeverity = Math.min(5, baseSeverity + recurrenceBump);
 
-      await updateDoc(reportRef, {
-        confirmationsCount: increment(1),
-        severity: finalSeverity,
-        votedUserIds: voters
-      });
+      const batch = writeBatch(db);
+
+      let isReopening = false;
+      if (reportData.status === 'resolved') {
+        isReopening = true;
+        batch.update(reportRef, {
+          status: 'reopened',
+          reopenedAt: new Date().toISOString(),
+          confirmationsCount: confirmations,
+          severity: finalSeverity,
+          votedUserIds: voters
+        });
+        
+        // Claw back points and add strikes to everyone who provided resolution proofs
+        const resolvedByList = reportData.resolvedByList || [];
+        for (const resolverId of resolvedByList) {
+          // Never claw back from original reporter
+          if (resolverId === reportData.reporterId) continue;
+          
+          const resolverRef = doc(db, 'users', resolverId);
+          const resolverDoc = await getDoc(resolverRef);
+          if (resolverDoc.exists()) {
+            const resolverData = resolverDoc.data();
+            const newStrikes = (resolverData.strikes || 0) + 1;
+            const updates: any = {
+              points: Math.max(0, (resolverData.points || 0) - 20),
+              strikes: newStrikes
+            };
+            if (newStrikes >= 3) {
+              updates.flaggedForReview = true;
+            }
+            batch.update(resolverRef, updates);
+          }
+        }
+      } else {
+        batch.update(reportRef, {
+          confirmationsCount: confirmations,
+          severity: finalSeverity,
+          votedUserIds: voters
+        });
+      }
 
       // Award points (+15 XP for active verification)
       if (currentUserProfile && votingUser !== 'anonymous') {
         const userRef = doc(db, 'users', votingUser);
-        await updateDoc(userRef, {
-          points: increment(15)
+        const verificationPoints = currentUserProfile.flaggedForReview ? 5 : 15;
+        batch.update(userRef, {
+          points: increment(verificationPoints)
         });
       }
+      
+      await batch.commit();
     } catch (err) {
       console.error('Error processing community vote:', err);
     }
@@ -499,6 +538,7 @@ export default function App() {
 
         if (resolvedByList.length >= 3) {
           updates.status = 'resolved';
+          updates.resolvedAt = new Date().toISOString();
           
           // Send email if it's flat or common area
           if (reportData.tier === 'flat' || reportData.tier === 'common_area') {
@@ -524,7 +564,8 @@ export default function App() {
         
         // Award points to the verifier
         const userRef = doc(db, 'users', sessionUserId);
-        batch.update(userRef, { points: increment(20) });
+        const verificationPoints = currentUserProfile?.flaggedForReview ? 5 : 20;
+        batch.update(userRef, { points: increment(verificationPoints) });
         
         await batch.commit();
         setVerifyingResolutionReport(null);

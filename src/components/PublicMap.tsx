@@ -500,7 +500,7 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
                   // Quick update client side
                   setSelectedReport(prev => prev ? { ...prev, confirmationsCount: prev.confirmationsCount + 1 } : null);
                 }}
-                disabled={currentUserProfile?.id === selectedReport.reporterId || selectedReport.status === 'resolved' || (selectedReport.votedUserIds?.includes(currentUserProfile?.id || ''))}
+                disabled={currentUserProfile?.id === selectedReport.reporterId || (selectedReport.votedUserIds?.includes(currentUserProfile?.id || ''))}
                 className="flex items-center gap-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-1.5 rounded-md border border-red-200/50 disabled:opacity-50"
                 title="Confirm the issue is still active"
               >

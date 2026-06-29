@@ -7,6 +7,8 @@ export interface UserProfile {
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   points: number;
   badges: string[];
+  strikes?: number;
+  flaggedForReview?: boolean;
 }
 
 export interface Building {
@@ -44,7 +46,8 @@ export interface Report {
   lng?: number;
   address?: string;
   buildingId?: string; // building_id for flat/common_area
-  status: 'open' | 'in_progress' | 'resolved' | 'retracted';
+  status: 'open' | 'in_progress' | 'resolved' | 'retracted' | 'reopened';
+  resolvedAt?: string;
   severity: number; // 1-5
   confidence: number; // 0-100
   createdAt: string;
@@ -62,6 +65,8 @@ export interface Report {
   fixParticipants?: string[];
   resolvedByList?: string[];
   resolution_proofs?: number;
+  resolvedByUserId?: string;
+  reopenedAt?: string;
 }
 
 export interface RoutingLog {

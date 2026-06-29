@@ -137,7 +137,11 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
   const handleUpdateStatus = async (reportId: string, reporterId: string, newStatus: 'in_progress' | 'resolved') => {
     try {
       const reportRef = doc(db, 'reports', reportId);
-      await updateDoc(reportRef, { status: newStatus });
+      const updates: any = { status: newStatus };
+      if (newStatus === 'resolved') {
+        updates.resolvedAt = new Date().toISOString();
+      }
+      await updateDoc(reportRef, updates);
 
       const report = reports.find(r => r.id === reportId);
 
@@ -500,6 +504,11 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                           Start Resolution
                         </button>
                       )}
+                      {report.status === 'reopened' && (
+                        <span className="text-[10px] font-black text-red-700 bg-red-100 px-2.5 py-1.5 rounded-md flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Reopened
+                        </span>
+                      )}
                       {report.status !== 'resolved' && (
                         <button
                           onClick={() => handleUpdateStatus(report.id, report.reporterId, 'resolved')}
@@ -588,6 +597,50 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
               ))}
             </div>
           )}
+
+          {/* Flagged Accounts Section */}
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-black text-red-500 uppercase tracking-wider mb-2.5 px-1 flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Flagged for Review
+            </h4>
+            {residents.filter(r => r.flaggedForReview).length === 0 ? (
+              <p className="text-[10px] text-slate-400 italic px-1">No flagged accounts.</p>
+            ) : (
+              <div className="space-y-2">
+                {residents.filter(r => r.flaggedForReview).map((res) => (
+                  <div key={res.id} className="bg-red-50 rounded-xl p-3 border border-red-100 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-red-200 text-red-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          {res.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-red-800 truncate">{res.name}</p>
+                          <p className="text-[10px] text-red-600 truncate">{res.email}</p>
+                          <p className="text-[9px] text-red-700 font-semibold mt-0.5">{res.strikes} strikes (spam/false resolution proofs)</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const resRef = doc(db, 'users', res.id);
+                            await updateDoc(resRef, { flaggedForReview: false, strikes: 0 });
+                            fetchResidents();
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }}
+                        className="text-[9px] bg-white hover:bg-slate-50 text-slate-700 font-bold px-2 py-1 rounded border border-slate-200 transition-colors"
+                      >
+                        Clear Flags
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Admitted Residents Section */}
           <div className="mt-6 pt-4 border-t border-slate-100">

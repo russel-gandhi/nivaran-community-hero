@@ -333,8 +333,9 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
 
         // Award verification points
         const userRef = doc(db, 'users', currentUserProfile?.id || 'anonymous');
+        const verificationPoints = currentUserProfile?.flaggedForReview ? 5 : 15;
         await updateDoc(userRef, {
-          points: increment(15) // +15 for confirming
+          points: increment(verificationPoints) // reduced if flagged
         });
 
         setStep(6); // Go to Dedup success screen
@@ -447,10 +448,11 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
       };
       await addDoc(collection(db, 'routing_log'), logData);
 
-      // Award points (+50 for reporting verified issue)
+      // Award points (+50 for reporting verified issue, reduced if flagged)
       if (currentUserProfile) {
         const userRef = doc(db, 'users', currentUserProfile.id);
-        const newPoints = currentUserProfile.points + 50;
+        const basePoints = currentUserProfile.flaggedForReview ? 10 : 50;
+        const newPoints = currentUserProfile.points + basePoints;
         
         // Update badges logic
         const badges = [...(currentUserProfile.badges || [])];
