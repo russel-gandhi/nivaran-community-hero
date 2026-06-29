@@ -3,9 +3,43 @@ import { Camera, Upload, Trash2, CheckCircle2, Sparkles, Video, StopCircle, Refr
 import { getAccessToken } from '../lib/auth';
 import exifr from 'exifr';
 
+const computeDHash = (base64: string): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 9;
+      canvas.height = 8;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve('');
+      ctx.drawImage(img, 0, 0, 9, 8);
+      const data = ctx.getImageData(0, 0, 9, 8).data;
+      let hash = '';
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) {
+          const leftIdx = (y * 9 + x) * 4;
+          const rightIdx = (y * 9 + (x + 1)) * 4;
+          
+          const leftGray = data[leftIdx] * 0.299 + data[leftIdx + 1] * 0.587 + data[leftIdx + 2] * 0.114;
+          const rightGray = data[rightIdx] * 0.299 + data[rightIdx + 1] * 0.587 + data[rightIdx + 2] * 0.114;
+          
+          hash += leftGray > rightGray ? '1' : '0';
+        }
+      }
+      let hexHash = '';
+      for (let i = 0; i < 64; i += 4) {
+        hexHash += parseInt(hash.substring(i, i + 4), 2).toString(16);
+      }
+      resolve(hexHash);
+    };
+    img.onerror = () => resolve('');
+    img.src = base64;
+  });
+};
+
 interface EvidenceUploaderProps {
   evidenceType: 'photo' | 'video' | 'audio';
-  onEvidenceCaptured: (base64Url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }) => void;
+  onEvidenceCaptured: (base64Url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }, imageHash?: string) => void;
 }
 
 // Interactive Indian Civic Issue Presets for Easy Demo Testing
@@ -92,10 +126,14 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const base64 = e.target?.result as string;
       setSelectedEvidence(base64);
-      onEvidenceCaptured(base64, extractedMetadata);
+      let imageHash: string | undefined;
+      if (evidenceType === 'photo') {
+        imageHash = await computeDHash(base64);
+      }
+      onEvidenceCaptured(base64, extractedMetadata, imageHash);
     };
     reader.readAsDataURL(file);
   };
@@ -192,10 +230,14 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
       }
 
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const base64 = e.target?.result as string;
         setSelectedEvidence(base64);
-        onEvidenceCaptured(base64, extractedMetadata);
+        let imageHash: string | undefined;
+        if (evidenceType === 'photo') {
+          imageHash = await computeDHash(base64);
+        }
+        onEvidenceCaptured(base64, extractedMetadata, imageHash);
       };
       reader.readAsDataURL(blob);
     } catch (err) {
@@ -211,7 +253,7 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
     // Convert image URL to base64 via canvas
     const img = new Image();
     img.crossOrigin = 'Anonymous';
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width > 600 ? 600 : img.width;
       canvas.height = (canvas.width / img.width) * img.height;
@@ -219,7 +261,11 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
       if (ctx) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg');
-        onEvidenceCaptured(dataUrl);
+        let imageHash: string | undefined;
+        if (evidenceType === 'photo') {
+          imageHash = await computeDHash(dataUrl);
+        }
+        onEvidenceCaptured(dataUrl, undefined, imageHash);
       }
     };
     img.src = presetUrl;
@@ -264,7 +310,7 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
   };
 
   // Capture Live Photo
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current) {
       const video = videoRef.current;
       const canvas = document.createElement('canvas');
@@ -275,7 +321,11 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg');
         setSelectedEvidence(dataUrl);
-        onEvidenceCaptured(dataUrl);
+        let imageHash: string | undefined;
+        if (evidenceType === 'photo') {
+          imageHash = await computeDHash(dataUrl);
+        }
+        onEvidenceCaptured(dataUrl, undefined, imageHash);
         stopCamera();
       }
     }

@@ -49,6 +49,8 @@ export interface Report {
   confidence: number; // 0-100
   createdAt: string;
   lowMetadataConfidence?: boolean;
+  imageHash?: string;
+  possibleReusedImage?: boolean;
   verifiedAt?: string;
   confirmationsCount: number;
   reasoning?: string;

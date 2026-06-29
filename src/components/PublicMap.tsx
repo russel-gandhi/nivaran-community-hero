@@ -144,7 +144,6 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
                     reg.showNotification(`Nearby Issue: ${r.categoryName}`, {
                        body: `There's a ${r.categoryName} issue nearby — is it still a problem?`,
                        icon: '/vite.svg',
-                       vibrate: [200, 100, 200, 100, 200, 100, 200],
                        data: { reportId: r.id }
                     });
                  });
@@ -478,6 +477,12 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
               <p className="text-[10px] text-slate-400">
                 Reported by {selectedReport.reporterName} • {new Date(selectedReport.createdAt).toLocaleDateString()}
               </p>
+              {selectedReport.possibleReusedImage && (
+                <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-red-700 bg-red-50 p-1.5 rounded-lg border border-red-200">
+                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                  <span>Possible Reused Image (Internal Review Flag)</span>
+                </div>
+              )}
             </div>
           </div>
 

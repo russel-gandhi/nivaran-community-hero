@@ -6,6 +6,20 @@ import EvidenceUploader from './EvidenceUploader';
 import AudioRecorder from './AudioRecorder';
 import { ChevronRight, ChevronLeft, ShieldAlert, AlertTriangle, CheckCircle, Sparkles, AlertCircle, RefreshCw, Award } from 'lucide-react';
 
+const hammingDistance = (hash1: string, hash2: string) => {
+  let diff = 0;
+  for (let i = 0; i < Math.min(hash1.length, hash2.length); i++) {
+    const val1 = parseInt(hash1[i], 16) || 0;
+    const val2 = parseInt(hash2[i], 16) || 0;
+    let xor = val1 ^ val2;
+    while (xor > 0) {
+      diff += xor & 1;
+      xor >>= 1;
+    }
+  }
+  return diff;
+};
+
 interface ReportIssueWizardProps {
   currentUserProfile: UserProfile | null;
   onIssueReported: (pointsEarned: number) => void;
@@ -25,6 +39,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   const [description, setDescription] = useState('');
   const [evidenceUrl, setEvidenceUrl] = useState<string>('');
   const [evidenceMetadata, setEvidenceMetadata] = useState<{ lat?: number; lng?: number; timestamp?: number } | undefined>();
+  const [imageHash, setImageHash] = useState<string | undefined>();
   const [evidenceType, setEvidenceType] = useState<'photo' | 'video' | 'audio'>('photo');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -150,13 +165,14 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   };
 
   // Step 4 -> Step 5 (Verification Agent)
-  const handleEvidenceCaptured = (url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }) => {
+  const handleEvidenceCaptured = (url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }, hash?: string) => {
     setEvidenceUrl(url);
     if (metadata) {
       setEvidenceMetadata(metadata);
     } else {
       setEvidenceMetadata(undefined);
     }
+    setImageHash(hash);
   };
 
   const runVerificationAgent = async () => {
@@ -332,6 +348,22 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         finalAddress = publicLocation;
       }
 
+      // Perceptual Hash Check
+      let possibleReusedImage = false;
+      if (evidenceType === 'photo' && imageHash) {
+        const allReportsSnapshot = await getDocs(collection(db, 'reports'));
+        for (const rDoc of allReportsSnapshot.docs) {
+          const rData = rDoc.data();
+          if (rData.evidenceType === 'photo' && rData.imageHash) {
+            const dist = hammingDistance(imageHash, rData.imageHash);
+            if (dist <= 10) { // Near-identical
+              possibleReusedImage = true;
+              break;
+            }
+          }
+        }
+      }
+
       // Write report to Firestore
       const hasMetadataCoords = evidenceMetadata?.lat !== undefined && evidenceMetadata?.lng !== undefined;
       const newReport: Omit<Report, 'id'> = {
@@ -355,7 +387,9 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         votedUserIds: [currentUserProfile?.id || 'anonymous'],
         lowMetadataConfidence: !hasMetadataCoords,
         lat: evidenceMetadata?.lat,
-        lng: evidenceMetadata?.lng
+        lng: evidenceMetadata?.lng,
+        imageHash: imageHash,
+        possibleReusedImage: possibleReusedImage
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {

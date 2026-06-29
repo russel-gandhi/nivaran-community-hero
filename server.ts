@@ -427,11 +427,11 @@ app.post('/api/send-email', async (req, res) => {
       '',
       messageHtml,
     ];
-    const message = messageParts.join('\\n');
+    const message = messageParts.join('\n');
     const encodedMessage = Buffer.from(message)
       .toString('base64')
-      .replace(/\\+/g, '-')
-      .replace(/\\//g, '_')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
       .replace(/=+$/, '');
 
     await gmail.users.messages.send({

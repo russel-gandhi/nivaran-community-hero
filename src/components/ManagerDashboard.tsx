@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
 import { Report, Building, UserProfile } from '../types';
-import { CheckCircle, Clock, BarChart3, ArrowRight, Play, Pause, AlertTriangle, User2, X } from 'lucide-react';
+import { CheckCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Play, Pause, AlertTriangle, User2, X } from 'lucide-react';
 
 interface ManagerDashboardProps {
   currentBuildingId: string;
@@ -469,6 +469,12 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                           <span>Low Metadata Confidence: Missing or unmatched GPS/Time EXIF data.</span>
                         </div>
                       )}
+                      {report.possibleReusedImage && (
+                        <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-red-700 bg-red-50 p-1.5 rounded-lg border border-red-200">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>Possible Reused Image: Similar evidence found in previous reports. Manual review required.</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -721,6 +727,12 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                         <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
                           <AlertTriangle className="w-3 h-3 shrink-0" />
                           <span>Low Metadata Confidence</span>
+                        </div>
+                      )}
+                      {report.possibleReusedImage && (
+                        <div className="flex items-start gap-1 mt-1 text-[9px] font-bold text-red-700 bg-red-50 p-1.5 rounded-lg border border-red-200">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>Possible Reused Image</span>
                         </div>
                       )}
                     </div>
