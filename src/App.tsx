@@ -44,8 +44,47 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('verify')) {
+    const verifyId = params.get('verify');
+    const confirm = params.get('confirm');
+    
+    if (verifyId) {
       setActiveTab('map');
+      
+      if (confirm) {
+        // Automatically handle email action links
+        const handleConfirmAction = async () => {
+          try {
+            const reportRef = doc(db, 'reports', verifyId);
+            const reportSnap = await getDoc(reportRef);
+            if (reportSnap.exists()) {
+              const rData = reportSnap.data();
+              if (rData.status === 'resolved') {
+                if (confirm === 'no') {
+                   // User says it's not fixed, reopen it
+                   await updateDoc(reportRef, { status: 'open' });
+                   alert('Thank you for confirming. The issue has been reopened and routed back for further action.');
+                } else if (confirm === 'yes') {
+                   alert('Thank you! Glad to hear the issue is successfully resolved.');
+                }
+              } else {
+                // Time-decay follow up case (report was open)
+                if (confirm === 'no') {
+                   // User says it's no longer a problem, mark resolved
+                   await updateDoc(reportRef, { status: 'resolved' });
+                   alert('Thank you! The issue has been marked as resolved.');
+                } else if (confirm === 'yes') {
+                   alert('Thank you for confirming. The issue will remain open and escalated.');
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error handling confirm:', err);
+          }
+          // Clean up URL so it doesn't run again on refresh
+          window.history.replaceState({}, '', '/');
+        };
+        handleConfirmAction();
+      }
     }
   }, []);
   const [isReporting, setIsReporting] = useState(false);
@@ -242,9 +281,10 @@ export default function App() {
   const handleGoogleLogin = async (role: 'citizen' | 'manager' = 'citizen') => {
     try {
       const provider = new GoogleAuthProvider();
-      // Add scopes for Google Drive Picker
+      // Add scopes for Google Drive Picker and Gmail
       provider.addScope('https://www.googleapis.com/auth/drive.file');
       provider.addScope('https://www.googleapis.com/auth/drive.metadata.readonly');
+      provider.addScope('https://www.googleapis.com/auth/gmail.send');
       // Force account selection to allow easily switching accounts during testing
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -923,6 +963,7 @@ export default function App() {
               currentBuildingId={managerBuildingId}
               onBuildingChanged={setManagerBuildingId}
               currentUserProfile={currentUserProfile}
+              accessToken={accessToken}
             />
           ) : currentRole === 'anonymous' ? (
             <div className="space-y-4" id="public-map-wrapper">

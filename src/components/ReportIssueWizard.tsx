@@ -330,6 +330,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
       const newReport: Omit<Report, 'id'> = {
         reporterId: currentUserProfile?.id || 'anonymous',
         reporterName: currentUserProfile?.name || 'Anonymous Citizen',
+        reporterEmail: currentUserProfile?.email || '',
         tier: selectedTier!,
         categoryId: selectedCategory?.id || '',
         categoryName: selectedCategory?.name || '',

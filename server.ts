@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import * as dotenv from 'dotenv';
+import { google } from 'googleapis';
 
 // Load environment variables
 dotenv.config();
@@ -342,6 +343,76 @@ app.post('/api/route-report', (req, res) => {
     deptName,
     message: `Civic issue automatically routed and formal complaint filed with simulated department: ${deptName}.`
   });
+});
+
+// 4. Send Email Agent (Step 11 & Step 12)
+app.post('/api/send-email', async (req, res) => {
+  try {
+    const { accessToken, to, subject, type, reportId, category, actionUrl } = req.body;
+    
+    if (!accessToken || !to) {
+      return res.status(400).json({ error: 'Missing access token or recipient' });
+    }
+
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+    const gmail = google.gmail({ version: 'v1', auth });
+
+    let messageText = '';
+    let messageHtml = '';
+
+    if (type === 'resolved_confirmation') {
+      messageText = `Your reported ${category} issue has been marked resolved — can you confirm it's actually fixed?\n\nPlease confirm: ${actionUrl}`;
+      messageHtml = `
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h2>Issue Resolution Confirmation</h2>
+          <p>Your reported <strong>${category}</strong> issue has been marked resolved.</p>
+          <p>Can you confirm it's actually fixed?</p>
+          <a href="${actionUrl}&confirm=yes" style="display:inline-block; padding: 10px 20px; background: #16a34a; color: #fff; text-decoration: none; border-radius: 5px; margin-right: 10px;">Yes, it's fixed</a>
+          <a href="${actionUrl}&confirm=no" style="display:inline-block; padding: 10px 20px; background: #dc2626; color: #fff; text-decoration: none; border-radius: 5px;">No, reopen it</a>
+        </div>
+      `;
+    } else if (type === 'time_decay') {
+      messageText = `Your reported ${category} issue has been open for a while. Is it still a problem?\n\nPlease confirm: ${actionUrl}`;
+      messageHtml = `
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h2>Issue Status Check</h2>
+          <p>Your reported <strong>${category}</strong> issue has been open past the 5-day threshold with no resolution.</p>
+          <p>Is it still a problem?</p>
+          <a href="${actionUrl}&confirm=no" style="display:inline-block; padding: 10px 20px; background: #16a34a; color: #fff; text-decoration: none; border-radius: 5px; margin-right: 10px;">No, it's resolved</a>
+          <a href="${actionUrl}&confirm=yes" style="display:inline-block; padding: 10px 20px; background: #dc2626; color: #fff; text-decoration: none; border-radius: 5px;">Yes, still a problem</a>
+        </div>
+      `;
+    }
+
+    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+    const messageParts = [
+      `To: ${to}`,
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `Subject: ${utf8Subject}`,
+      '',
+      messageHtml,
+    ];
+    const message = messageParts.join('\\n');
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\\+/g, '-')
+      .replace(/\\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Start Express server and integrate Vite middleware

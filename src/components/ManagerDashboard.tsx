@@ -8,9 +8,10 @@ interface ManagerDashboardProps {
   currentBuildingId: string;
   onBuildingChanged: (id: string) => void;
   currentUserProfile: UserProfile | null;
+  accessToken?: string | null;
 }
 
-export default function ManagerDashboard({ currentBuildingId, onBuildingChanged, currentUserProfile }: ManagerDashboardProps) {
+export default function ManagerDashboard({ currentBuildingId, onBuildingChanged, currentUserProfile, accessToken }: ManagerDashboardProps) {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -138,12 +139,32 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
       const reportRef = doc(db, 'reports', reportId);
       await updateDoc(reportRef, { status: newStatus });
 
+      const report = reports.find(r => r.id === reportId);
+
       // If marked resolved, award the reporter bonus points (+100 XP)
       if (newStatus === 'resolved' && reporterId && reporterId !== 'anonymous') {
         const userRef = doc(db, 'users', reporterId);
         await updateDoc(userRef, {
           points: increment(100)
         });
+
+        // Send email notification to reporter if possible
+        if (accessToken && report && report.reporterEmail) {
+          const actionUrl = `${window.location.origin}/?verify=${report.id}`;
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accessToken,
+              to: report.reporterEmail,
+              subject: `Your ${report.categoryName} report has been resolved`,
+              type: 'resolved_confirmation',
+              reportId: report.id,
+              category: report.categoryName,
+              actionUrl
+            })
+          });
+        }
       }
 
       // Re-fetch reports
@@ -266,13 +287,48 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           <div className="space-y-3" id="manager-tickets-list">
             <div className="flex justify-between items-center px-1">
               <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({reports.length})</h4>
-              <button
-                onClick={fetchBuildingReports}
-                className="text-xs text-orange-600 hover:text-orange-800 font-bold flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-md"
-                id="refresh-manager-tickets"
-              >
-                Refresh List
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const now = Date.now();
+                    let sentCount = 0;
+                    for (const r of reports) {
+                      if (r.status === 'open' || r.status === 'in_progress') {
+                        const elapsed = now - new Date(r.createdAt).getTime();
+                        const days = elapsed / (1000 * 60 * 60 * 24);
+                        if (days >= 5 && accessToken && r.reporterEmail) {
+                          const actionUrl = `${window.location.origin}/?verify=${r.id}`;
+                          await fetch('/api/send-email', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              accessToken,
+                              to: r.reporterEmail,
+                              subject: `Status Update: ${r.categoryName}`,
+                              type: 'time_decay',
+                              reportId: r.id,
+                              category: r.categoryName,
+                              actionUrl
+                            })
+                          });
+                          sentCount++;
+                        }
+                      }
+                    }
+                    alert(`Sent ${sentCount} time-decay follow-up emails.`);
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md"
+                >
+                  Run Time-Decay Check
+                </button>
+                <button
+                  onClick={fetchBuildingReports}
+                  className="text-xs text-orange-600 hover:text-orange-800 font-bold flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-md"
+                  id="refresh-manager-tickets"
+                >
+                  Refresh List
+                </button>
+              </div>
             </div>
 
             {loading ? (

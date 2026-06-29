@@ -32,6 +32,7 @@ export interface Report {
   id: string;
   reporterId: string;
   reporterName: string;
+  reporterEmail?: string;
   tier: 'flat' | 'common_area' | 'public';
   categoryId: string;
   categoryName: string;
