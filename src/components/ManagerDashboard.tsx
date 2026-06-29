@@ -248,12 +248,12 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Logged in Role</span>
           <h3 className="text-sm font-extrabold text-slate-800 mt-0.5">Building Administrator</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <span className="text-xs text-slate-500 font-medium shrink-0">Switch Property:</span>
           <select
             value={currentBuildingId}
             onChange={(e) => onBuildingChanged(e.target.value)}
-            className="text-xs bg-slate-100 text-slate-800 px-3 py-2 rounded-lg border-0 focus:ring-2 focus:ring-orange-500 font-bold"
+            className="w-full sm:w-auto text-xs bg-slate-100 text-slate-800 px-3 py-2 rounded-lg border-0 focus:ring-2 focus:ring-orange-500 font-bold truncate"
             id="manager-property-select"
           >
             {buildingsList.map(b => (

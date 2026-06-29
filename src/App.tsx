@@ -5,6 +5,8 @@ import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signI
 import { UserProfile, Report } from './types';
 import CitizenDashboard from './components/CitizenDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
+import ManagerOnboarding from './components/ManagerOnboarding';
+import AdminDashboard from './components/AdminDashboard';
 import PublicMap from './components/PublicMap';
 import LeaderboardView from './components/LeaderboardView';
 import DonationView from './components/DonationView';
@@ -42,7 +44,7 @@ export default function App() {
   const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   // Navigation & Role states
-  const [currentRole, setCurrentRole] = useState<'citizen' | 'manager' | 'anonymous'>('citizen');
+  const [currentRole, setCurrentRole] = useState<'citizen' | 'manager' | 'anonymous' | 'admin'>('citizen');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'map' | 'leaderboard' | 'donate'>('dashboard');
 
   useEffect(() => {
@@ -126,12 +128,7 @@ export default function App() {
   ) : false;
 
   const isManagerAuthorized = isPrimaryManager || isCoManager;
-
-  useEffect(() => {
-    if (currentUserProfile && currentRole === 'manager' && !isManagerAuthorized) {
-      setCurrentRole('citizen');
-    }
-  }, [currentUserProfile, currentRole, isManagerAuthorized]);
+  const isAdmin = currentUserProfile?.email === 'admin.nivaran@gmail.com' || currentUserProfile?.email === 'russelgandhi@gmail.com';
 
   // 1. Sync User Profile from Firestore
   useEffect(() => {
@@ -344,7 +341,11 @@ export default function App() {
       setCurrentRole(loginRole);
     } catch (err: any) {
       console.error('Email Auth failed:', err);
-      setAuthError(err.message || 'Authentication failed. Please try again.');
+      if (err.code === 'auth/operation-not-allowed') {
+        setAuthError('Email/password sign-in is disabled in your Firebase Console. Please use "Sign in with Google" or the "Demo Accounts" below.');
+      } else {
+        setAuthError(err.message || 'Authentication failed. Please try again.');
+      }
     }
   };
 
@@ -649,11 +650,11 @@ export default function App() {
   // Render Google Sign-In Screen if not authenticated
   if (!sessionUserId) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4" id="google-login-viewport">
+      <div className="min-h-screen bg-slate-900 flex justify-center items-center p-0 sm:p-4" id="google-login-viewport">
         {/* Decorative background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-950/40 via-slate-950 to-slate-950 -z-10" />
 
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-6 text-center animate-in zoom-in-95 duration-300">
+        <div className="w-full sm:w-[400px] sm:max-w-[400px] bg-white sm:rounded-3xl shadow-2xl flex flex-col h-screen sm:h-[812px] sm:max-h-[812px] relative overflow-hidden border border-slate-200/50 p-6 text-center animate-in zoom-in-95 duration-300 overflow-y-auto">
           <div className="space-y-2">
             <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto text-orange-600 mb-2">
               <Building2 className="w-6 h-6 animate-pulse" />
@@ -724,6 +725,10 @@ export default function App() {
                     <div className="w-full border-t border-slate-200"></div>
                   </div>
                   <span className="relative bg-slate-50 px-3 text-[10px] font-bold text-slate-400 uppercase">Or use email</span>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left mb-3 text-[11px] text-amber-800 leading-normal">
+                  ⚠️ <strong>Notice:</strong> Email authentication might be disabled in your Firebase Console. If so, please use <strong>Sign in with Google</strong> or the <strong>Demo Accounts</strong> below to proceed!
                 </div>
 
                 <form onSubmit={handleEmailAuth} className="space-y-3">
@@ -808,10 +813,10 @@ export default function App() {
   }
 
   // Render Choose Building Onboarding Screen
-  if (currentUserProfile && !currentUserProfile.registeredBuildingId) {
+  if (currentRole === 'citizen' && currentUserProfile && !currentUserProfile.registeredBuildingId) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4" id="onboarding-viewport">
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 animate-in zoom-in-95 duration-300">
+      <div className="min-h-screen bg-slate-950 flex justify-center items-center p-0 sm:p-4" id="onboarding-viewport">
+        <div className="w-full sm:w-[400px] sm:max-w-[400px] bg-white sm:rounded-3xl shadow-2xl flex flex-col h-screen sm:h-[812px] sm:max-h-[812px] relative overflow-hidden border border-slate-200/50 p-6 animate-in zoom-in-95 duration-300 overflow-y-auto">
           <div className="text-center space-y-1">
             <span className="text-[10px] font-extrabold text-orange-500 uppercase tracking-widest bg-orange-50 px-2 py-0.5 rounded-md inline-block">Step 2: Onboarding</span>
             <h2 className="text-lg font-black text-slate-800 mt-1">Select Your Residence</h2>
@@ -883,11 +888,11 @@ export default function App() {
   }
 
   // Render Pending Admission Screen
-  if (currentUserProfile && currentUserProfile.registeredBuildingId && currentUserProfile.approvalStatus === 'pending') {
+  if (currentRole === 'citizen' && currentUserProfile && currentUserProfile.registeredBuildingId && currentUserProfile.approvalStatus === 'pending') {
     const selectedBldName = currentUserProfile.registeredBuildingId === 'sunrise-apts' ? 'Sunrise Apartments' : 'Greenview Society';
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4" id="pending-approval-viewport">
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center animate-in zoom-in-95 duration-300">
+      <div className="min-h-screen bg-slate-950 flex justify-center items-center p-0 sm:p-4" id="pending-approval-viewport">
+        <div className="w-full sm:w-[400px] sm:max-w-[400px] bg-white sm:rounded-3xl shadow-2xl flex flex-col h-screen sm:h-[812px] sm:max-h-[812px] relative overflow-hidden border border-slate-200/50 p-6 text-center animate-in zoom-in-95 duration-300 overflow-y-auto">
           <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500 border border-amber-200">
             <RefreshCw className="w-8 h-8 animate-spin" />
           </div>
@@ -944,11 +949,11 @@ export default function App() {
   }
 
   // Render Rejected Admission Screen
-  if (currentUserProfile && currentUserProfile.registeredBuildingId && currentUserProfile.approvalStatus === 'rejected') {
+  if (currentRole === 'citizen' && currentUserProfile && currentUserProfile.registeredBuildingId && currentUserProfile.approvalStatus === 'rejected') {
     const selectedBldName = currentUserProfile.registeredBuildingId === 'sunrise-apts' ? 'Sunrise Apartments' : 'Greenview Society';
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4" id="rejected-approval-viewport">
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center animate-in zoom-in-95 duration-300">
+      <div className="min-h-screen bg-slate-950 flex justify-center items-center p-0 sm:p-4" id="rejected-approval-viewport">
+        <div className="w-full sm:w-[400px] sm:max-w-[400px] bg-white sm:rounded-3xl shadow-2xl flex flex-col h-screen sm:h-[812px] sm:max-h-[812px] relative overflow-hidden border border-slate-200/50 p-6 text-center animate-in zoom-in-95 duration-300 overflow-y-auto">
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500 border border-red-200">
             <ShieldCheck className="w-8 h-8" />
           </div>
@@ -996,9 +1001,9 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex justify-center py-0 sm:py-6" id="app-viewport">
+    <div className="min-h-screen bg-slate-50 flex justify-center items-center py-0 sm:py-6" id="app-viewport">
       {/* Mobile-first frame wrapping */}
-      <div className="w-full max-w-md bg-white sm:rounded-3xl shadow-2xl flex flex-col min-h-screen sm:min-h-[812px] relative overflow-hidden border border-slate-200/50">
+      <div className="w-full sm:w-[400px] sm:max-w-[400px] bg-white sm:rounded-3xl shadow-2xl flex flex-col h-screen sm:h-[812px] sm:max-h-[812px] relative overflow-hidden border border-slate-200/50">
         
         {/* Real-time Resolution Toast Overlay */}
         {resolvedToast && (
@@ -1064,7 +1069,7 @@ export default function App() {
             >
               Citizen
             </button>
-            {isManagerAuthorized && (
+            {isManagerAuthorized ? (
               <button
                 onClick={() => {
                   setCurrentRole('manager');
@@ -1076,6 +1081,32 @@ export default function App() {
                 id="role-manager-btn"
               >
                 Manager
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setCurrentRole('manager');
+                  setIsReporting(false);
+                }}
+                className={`text-[9px] font-black px-2 py-1 rounded-md transition-all ${
+                  currentRole === 'manager' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-400'
+                }`}
+                id="role-manager-btn"
+              >
+                Manager Access
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setCurrentRole('admin');
+                  setIsReporting(false);
+                }}
+                className={`text-[9px] font-black px-2 py-1 rounded-md transition-all ${
+                  currentRole === 'admin' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-400'
+                }`}
+              >
+                Admin
               </button>
             )}
             <button
@@ -1142,13 +1173,19 @@ export default function App() {
               onIssueReported={handleIssueReported}
               onCancel={() => setIsReporting(false)}
             />
+          ) : currentRole === 'admin' ? (
+            <AdminDashboard />
           ) : currentRole === 'manager' ? (
-            <ManagerDashboard
-              currentBuildingId={managerBuildingId}
-              onBuildingChanged={setManagerBuildingId}
-              currentUserProfile={currentUserProfile}
-              accessToken={accessTokenState}
-            />
+            isManagerAuthorized ? (
+              <ManagerDashboard
+                currentBuildingId={managerBuildingId}
+                onBuildingChanged={setManagerBuildingId}
+                currentUserProfile={currentUserProfile}
+                accessToken={accessTokenState}
+              />
+            ) : (
+              <ManagerOnboarding currentUserProfile={currentUserProfile} />
+            )
           ) : currentRole === 'anonymous' ? (
             <div className="space-y-4" id="public-map-wrapper">
               <div className="bg-amber-50 border border-amber-200/60 p-3 rounded-xl text-[11px] text-amber-800">

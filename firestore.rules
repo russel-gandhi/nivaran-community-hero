@@ -16,5 +16,8 @@ service cloud.firestore {
     match /routing_log/{logId} {
       allow read, write: if true;
     }
+    match /pending_managers/{pmId} {
+      allow read, write: if true;
+    }
   }
 }

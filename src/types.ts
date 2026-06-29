@@ -30,6 +30,18 @@ export interface Category {
   evidenceType: 'photo' | 'video' | 'audio';
 }
 
+export interface PendingManager {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  claimedBuildingName: string;
+  proofText: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 export interface Report {
   id: string;
   reporterId: string;

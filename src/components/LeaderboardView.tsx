@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UserProfile, LeaderboardUser } from '../types';
-import { Trophy, Medal, ArrowUpRight } from 'lucide-react';
+import { Trophy, Medal, ArrowUpRight, Gift, Lock, Unlock, Tag, Check, Copy } from 'lucide-react';
 import BadgeIllustration from './BadgeIllustration';
 
 interface LeaderboardViewProps {
@@ -186,6 +186,147 @@ export default function LeaderboardView({ currentUserProfile, allProfiles }: Lea
             );
           })}
         </div>
+      </div>
+
+      {/* Rewards & Coupons Section */}
+      <RewardsSection currentUserPoints={currentUserProfile?.points || 0} />
+    </div>
+  );
+}
+
+const MOCK_REWARDS = [
+  {
+    id: 'rew-1',
+    title: '10% OFF Fresh Produce',
+    partner: 'GreenGrocer Organic',
+    desc: 'Save 10% on fresh organic fruits and vegetables from local partner stores.',
+    pointsNeeded: 100,
+    code: 'GREEN10NIVARAN',
+    color: 'emerald'
+  },
+  {
+    id: 'rew-2',
+    title: 'Free Ginger Cutting Chai',
+    partner: 'ChaiPoint Corner',
+    desc: 'Get a free piping hot ginger tea with any snack order at the society hub.',
+    pointsNeeded: 250,
+    code: 'CHAI250NIVARAN',
+    color: 'amber'
+  },
+  {
+    id: 'rew-3',
+    title: '₹200 OFF Home Cleaning',
+    partner: 'UrbanCare Services',
+    desc: 'Flat discount on professional sanitization, dry cleaning, or disinfection.',
+    pointsNeeded: 500,
+    code: 'CLEAN500NIVARAN',
+    color: 'blue'
+  }
+];
+
+function RewardsSection({ currentUserPoints }: { currentUserPoints: number }) {
+  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleReveal = (id: string) => {
+    setRevealedIds(prev => ({ ...prev, [id]: true }));
+  };
+
+  const handleCopy = (id: string, code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs" id="rewards-section-card">
+      <div className="flex items-center gap-2 mb-1">
+        <Gift className="w-4 h-4 text-orange-500" />
+        <h4 className="text-sm font-bold text-slate-800">Your Citizen Rewards</h4>
+      </div>
+      <p className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+        Earn points by reporting resolved civic issues and claim exclusive local discounts.
+      </p>
+
+      <div className="space-y-4" id="rewards-list">
+        {MOCK_REWARDS.map((reward) => {
+          const isUnlocked = currentUserPoints >= reward.pointsNeeded;
+          const isRevealed = revealedIds[reward.id];
+          const isCopied = copiedId === reward.id;
+
+          // Resolve color theme safely
+          const colorClasses = 
+            reward.color === 'emerald' ? { bg: 'bg-emerald-50', border: 'border-emerald-200/60', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-800' } :
+            reward.color === 'amber' ? { bg: 'bg-amber-50', border: 'border-amber-200/60', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' } :
+            { bg: 'bg-blue-50', border: 'border-blue-200/60', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' };
+
+          return (
+            <div
+              key={reward.id}
+              className={`relative rounded-xl border p-3.5 transition-all flex flex-col justify-between gap-3 ${
+                isUnlocked 
+                  ? `${colorClasses.bg} ${colorClasses.border}` 
+                  : 'bg-slate-50/40 border-slate-100 opacity-60'
+              }`}
+              id={`reward-card-${reward.id}`}
+            >
+              {/* Point Indicator Corner Badge */}
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                {isUnlocked ? (
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${colorClasses.badge} flex items-center gap-0.5`}>
+                    <Check className="w-2.5 h-2.5" /> Unlocked
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-500 flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> {reward.pointsNeeded} XP
+                  </span>
+                )}
+              </div>
+
+              {/* Coupon details */}
+              <div className="pr-16">
+                <span className="text-[10px] font-bold text-slate-400 tracking-wider block uppercase">{reward.partner}</span>
+                <h5 className={`text-xs font-black mt-0.5 ${isUnlocked ? colorClasses.text : 'text-slate-600'}`}>{reward.title}</h5>
+                <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">{reward.desc}</p>
+              </div>
+
+              {/* Action and Redeem section */}
+              <div className="border-t border-slate-200/50 pt-2.5 flex items-center justify-between gap-2 mt-1">
+                {isUnlocked ? (
+                  isRevealed ? (
+                    <div className="w-full flex items-center justify-between bg-white/70 backdrop-blur-xs rounded-lg p-1 px-2 border border-slate-200/30">
+                      <code className="text-xs font-mono font-bold text-slate-700 tracking-wide select-all">
+                        {reward.code}
+                      </code>
+                      <button
+                        onClick={() => handleCopy(reward.id, reward.code)}
+                        className="p-1 hover:bg-slate-100 rounded-md transition-colors text-slate-500"
+                        title="Copy coupon code"
+                      >
+                        {isCopied ? (
+                          <span className="text-[9px] text-emerald-600 font-bold">Copied!</span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleReveal(reward.id)}
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <Tag className="w-3 h-3" /> Reveal Promo Code
+                    </button>
+                  )
+                ) : (
+                  <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Locked until you cross {reward.pointsNeeded} XP
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
