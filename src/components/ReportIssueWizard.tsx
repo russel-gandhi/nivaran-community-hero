@@ -426,10 +426,10 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         reasoning: verificationResult?.reasoning || 'Automatically ingested.',
         votedUserIds: [currentUserProfile?.id || 'anonymous'],
         lowMetadataConfidence: !hasMetadataCoords || distanceIsImplausible,
-        lat: evidenceMetadata?.lat,
-        lng: evidenceMetadata?.lng,
-        imageHash: imageHash,
-        possibleReusedImage: possibleReusedImage
+        lat: evidenceMetadata?.lat ?? null,
+        lng: evidenceMetadata?.lng ?? null,
+        imageHash: imageHash ?? null,
+        possibleReusedImage: possibleReusedImage ?? false
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {

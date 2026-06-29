@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
 import { Report, Building, UserProfile } from '../types';
-import { CheckCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Play, Pause, AlertTriangle, User2, X } from 'lucide-react';
+import { CheckCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Play, Pause, AlertTriangle, User2, X, FileSpreadsheet } from 'lucide-react';
+import { exportReportsToSheets } from '../lib/sheets';
 
 interface ManagerDashboardProps {
   currentBuildingId: string;
@@ -197,6 +198,24 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
     }
   };
 
+  const [exportingToSheets, setExportingToSheets] = useState(false);
+  const handleExportToSheets = async () => {
+    if (!accessToken) {
+      alert('You need to link your Google account to export.');
+      return;
+    }
+    setExportingToSheets(true);
+    try {
+      const url = await exportReportsToSheets(reports, accessToken);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export. Have you accepted the permissions?');
+    } finally {
+      setExportingToSheets(false);
+    }
+  };
+
   // Math Metrics
   const openCount = reports.filter(r => r.status === 'open').length;
   const progressCount = reports.filter(r => r.status === 'in_progress').length;
@@ -310,6 +329,15 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
             <div className="flex justify-between items-center px-1">
               <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({activeCount})</h4>
               <div className="flex gap-2">
+                <button
+                  onClick={handleExportToSheets}
+                  disabled={exportingToSheets}
+                  className="text-xs text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md disabled:opacity-50"
+                  title="Export to Google Sheets"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  {exportingToSheets ? 'Exporting...' : 'Export'}
+                </button>
                 <button
                   onClick={async () => {
                     const now = Date.now();

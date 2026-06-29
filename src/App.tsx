@@ -314,6 +314,7 @@ export default function App() {
       if (role === 'manager') {
         provider.addScope('https://www.googleapis.com/auth/gmail.send');
       }
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
       
       // Force account selection to allow easily switching accounts during testing
       provider.setCustomParameters({ prompt: 'select_account' });
@@ -1159,6 +1160,7 @@ export default function App() {
                 onOrganizeFix={handleOrganizeFix}
                 onFixVerified={handleFixVerified}
                 currentUserProfile={null} 
+                accessToken={accessTokenState}
               />
             </div>
           ) : (
@@ -1183,6 +1185,7 @@ export default function App() {
                     onOrganizeFix={handleOrganizeFix}
                     onFixVerified={handleFixVerified}
                     currentUserProfile={currentUserProfile} 
+                    accessToken={accessTokenState}
                   />
                 </div>
               )}

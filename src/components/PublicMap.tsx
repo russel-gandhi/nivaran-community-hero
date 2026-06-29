@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Report, UserProfile } from '../types';
-import { MapPin, Filter, Eye, AlertTriangle, CheckCircle, RefreshCw, ThumbsUp, ThumbsDown, X, Play, Loader2, Users, Upload } from 'lucide-react';
+import { MapPin, Filter, Eye, AlertTriangle, CheckCircle, RefreshCw, ThumbsUp, ThumbsDown, X, Play, Loader2, Users, Upload, FileSpreadsheet } from 'lucide-react';
 import AvatarIllustration from './AvatarIllustration';
+import { exportReportsToSheets } from '../lib/sheets';
 
 interface PublicMapProps {
   reports: Report[];
@@ -9,9 +10,10 @@ interface PublicMapProps {
   onOrganizeFix?: (reportId: string) => void;
   onFixVerified?: (reportId: string) => void;
   currentUserProfile: UserProfile | null;
+  accessToken?: string | null;
 }
 
-export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerified, currentUserProfile }: PublicMapProps) {
+export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerified, currentUserProfile, accessToken }: PublicMapProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -196,6 +198,24 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
   // Unique categories for filtering
   const categories = Array.from(new Set(publicReports.map(r => ({ id: r.categoryId, name: r.categoryName }))));
 
+  const [exportingToSheets, setExportingToSheets] = useState(false);
+  const handleExportToSheets = async () => {
+    if (!accessToken) {
+      alert('You need to link your Google account to export.');
+      return;
+    }
+    setExportingToSheets(true);
+    try {
+      const url = await exportReportsToSheets(publicReports, accessToken);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export. Have you accepted the permissions?');
+    } finally {
+      setExportingToSheets(false);
+    }
+  };
+
   // Determine severity color
   const getSeverityColor = (sev: number) => {
     if (sev >= 5) return 'bg-red-500 text-white border-red-700';
@@ -249,6 +269,15 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
             <option value="2">Moderate (2/5)</option>
             <option value="1">Low (1/5)</option>
           </select>
+          <button
+            onClick={handleExportToSheets}
+            disabled={exportingToSheets}
+            className="ml-auto text-xs text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 px-3 py-2 rounded-lg disabled:opacity-50 border border-emerald-200"
+            title="Export to Google Sheets"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            {exportingToSheets ? 'Exporting...' : 'Export Analytics to Sheets'}
+          </button>
         </div>
       </div>
 

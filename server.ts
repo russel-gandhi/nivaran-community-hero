@@ -69,7 +69,7 @@ app.post('/api/check-scope', async (req, res) => {
 Analyze the user's report description and decide if it falls into one of these categories:
 1. EMERGENCY: Suggests fire, an ongoing crime, a medical emergency, active physical danger, or a personal crisis.
 2. OUT_OF_SCOPE: About an individual driver or vehicle's behavior, a personal dispute with a neighbor, a landlord/billing dispute, naming/defaming a specific individual, political content, or a general informational question.
-3. VALID: Any legitimate building/civic issue (e.g. leaking plumbing, broken streetlights, broken lift, potholes, garbage, water drainage, construction noise, etc.).
+3. VALID: Any legitimate building/civic issue (e.g. leaking plumbing, broken streetlights, broken lift, potholes, garbage, water drainage, construction noise, private flat interior issues like broken door locks or appliances, etc.).
 
 Your output must be strictly JSON format conforming to this typescript interface:
 {
