@@ -197,6 +197,13 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
   const openCount = reports.filter(r => r.status === 'open').length;
   const progressCount = reports.filter(r => r.status === 'in_progress').length;
   const resolvedCount = reports.filter(r => r.status === 'resolved').length;
+  const retractedCount = reports.filter(r => r.status === 'retracted').length;
+  const activeCount = openCount + progressCount;
+  const historyCount = resolvedCount + retractedCount;
+
+  // Filter for rendering
+  const activeReports = reports.filter(r => r.status === 'open' || r.status === 'in_progress');
+  const historyReports = reports.filter(r => r.status === 'resolved' || r.status === 'retracted');
   const totalCount = reports.length;
 
   const resolutionRate = totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 0;
@@ -244,7 +251,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           }`}
           id="tab-manager-grievances"
         >
-          Grievances Queue ({reports.filter(r => r.status !== 'resolved').length})
+          Grievances Queue ({activeCount})
         </button>
         <button
           onClick={() => setActiveManagerTab('admissions')}
@@ -271,7 +278,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           }`}
           id="tab-manager-history"
         >
-          History ({reports.filter(r => r.status === 'resolved').length})
+          History ({historyCount})
         </button>
       </div>
 
@@ -297,7 +304,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
           {/* Ticket List */}
           <div className="space-y-3" id="manager-tickets-list">
             <div className="flex justify-between items-center px-1">
-              <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({reports.filter(r => r.status !== 'resolved').length})</h4>
+              <h4 className="text-sm font-bold text-slate-800">Assigned Building Grievances ({activeCount})</h4>
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
@@ -347,14 +354,14 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                 <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                 <p className="text-xs text-slate-400 mt-2 font-medium">Fetching active complaints...</p>
               </div>
-            ) : reports.filter(r => r.status !== 'resolved').length === 0 ? (
+            ) : activeReports.length === 0 ? (
               <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 p-6">
                 <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                 <p className="text-xs font-bold text-slate-600">Property complaints queue is empty</p>
                 <p className="text-[11px] text-slate-400 mt-1">Excellent! No flat or common-area hazards remain.</p>
               </div>
             ) : (
-              reports.filter(r => r.status !== 'resolved').map((report) => (
+              activeReports.map((report) => (
                 <div key={report.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3" id={`manager-ticket-${report.id}`}>
                   <div className="flex justify-between items-start">
                     <div>
@@ -637,10 +644,10 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
       {activeManagerTab === 'history' && (
         <div className="space-y-4" id="manager-history-panel">
           <div className="flex justify-between items-center px-1">
-            <h4 className="text-sm font-bold text-slate-800">Resolved Grievances ({reports.filter(r => r.status === 'resolved').length})</h4>
+            <h4 className="text-sm font-bold text-slate-800">Resolved & Retracted Grievances ({historyCount})</h4>
           </div>
 
-          {reports.filter(r => r.status === 'resolved').length === 0 ? (
+          {historyReports.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-2xl border border-slate-100 p-6">
               <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="text-xs font-bold text-slate-600">No resolved issues yet</p>
@@ -648,7 +655,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
             </div>
           ) : (
             <div className="space-y-3">
-              {reports.filter(r => r.status === 'resolved').map((report) => (
+              {historyReports.map((report) => (
                 <div key={report.id} className="bg-slate-50 rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3 opacity-80" id={`manager-history-${report.id}`}>
                   <div className="flex justify-between items-start">
                     <div>
@@ -663,9 +670,15 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                       </div>
                       <h5 className="text-sm font-bold text-slate-700 mt-1.5 line-through decoration-slate-400">{report.subtag}</h5>
                     </div>
-                    <span className="text-[10px] font-black text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Resolved
-                    </span>
+                    {report.status === 'retracted' ? (
+                      <span className="text-[10px] font-black text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <X className="w-3 h-3" /> Retracted
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Resolved
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">

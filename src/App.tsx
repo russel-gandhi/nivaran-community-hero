@@ -9,7 +9,7 @@ import PublicMap from './components/PublicMap';
 import LeaderboardView from './components/LeaderboardView';
 import ReportIssueWizard from './components/ReportIssueWizard';
 import ResolutionWizard from './components/ResolutionWizard';
-import { Trophy, Map as MapIcon, LayoutGrid, Building2, User2, ShieldCheck, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
+import { Trophy, Map as MapIcon, LayoutGrid, Building2, User2, ShieldCheck, Sparkles, RefreshCw, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { setAccessToken } from './lib/auth';
 import BuildingAutocomplete from './components/BuildingAutocomplete';
 
@@ -109,7 +109,9 @@ export default function App() {
 
   // Resolved Notification State
   const [resolvedToast, setResolvedToast] = useState<{ id: string; category: string; locationName: string } | null>(null);
+  const [retractedToast, setRetractedToast] = useState<{ id: string; category: string; locationName: string; isManagerNotif: boolean } | null>(null);
   const knownResolved = React.useRef<Set<string>>(new Set());
+  const knownRetracted = React.useRef<Set<string>>(new Set());
 
   const isPrimaryManager = currentUserProfile ? (
     currentUserProfile.id === 'u-mgr-sunrise' || 
@@ -248,6 +250,9 @@ export default function App() {
           if (data.status === 'resolved') {
              knownResolved.current.add(change.doc.id);
           }
+          if (data.status === 'retracted') {
+             knownRetracted.current.add(change.doc.id);
+          }
         } else if (change.type === 'modified') {
           if (data.status === 'resolved' && !knownResolved.current.has(change.doc.id)) {
              knownResolved.current.add(change.doc.id);
@@ -259,6 +264,26 @@ export default function App() {
              setTimeout(() => setResolvedToast(null), 5000);
           } else if (data.status !== 'resolved') {
              knownResolved.current.delete(change.doc.id); // in case it gets reopened
+          }
+          
+          if (data.status === 'retracted' && !knownRetracted.current.has(change.doc.id)) {
+            knownRetracted.current.add(change.doc.id);
+            // the retraction broadcast logic:
+            // if public tier -> everyone sees it.
+            // if flat/common_area -> only manager sees it.
+            const isManagerNotif = data.tier === 'flat' || data.tier === 'common_area';
+            
+            // Only trigger toast if it's public OR if current user is the manager of that building
+            // Actually, we'll just set the toast and let the UI decide whether to show it
+            setRetractedToast({
+              id: change.doc.id,
+              category: data.categoryName || 'A civic issue',
+              locationName: data.address || data.tier || 'your area',
+              isManagerNotif
+            });
+            setTimeout(() => setRetractedToast(null), 5000);
+          } else if (data.status !== 'retracted') {
+            knownRetracted.current.delete(change.doc.id);
           }
         }
       });
@@ -510,6 +535,17 @@ export default function App() {
     } catch (err) {
       console.error(err);
       alert('Error verifying resolution evidence.');
+    }
+  };
+
+  const handleRetractReport = async (reportId: string, tier: string) => {
+    try {
+      const reportRef = doc(db, 'reports', reportId);
+      await updateDoc(reportRef, {
+        status: 'retracted'
+      });
+    } catch (err) {
+      console.error('Failed to retract report:', err);
     }
   };
 
@@ -938,6 +974,23 @@ export default function App() {
           </div>
         )}
 
+        {/* Real-time Retraction Toast Overlay */}
+        {retractedToast && (!retractedToast.isManagerNotif || isPrimaryManager) && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[90%] max-w-[360px] animate-in slide-in-from-top-4 fade-in duration-300 pointer-events-none">
+            <div className="bg-slate-800 text-white rounded-2xl shadow-xl shadow-slate-800/20 p-3 flex items-start gap-3">
+              <div className="bg-white/20 p-1.5 rounded-full shrink-0">
+                <XCircle className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 pt-0.5">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-300 mb-0.5">Report Retracted</p>
+                <p className="text-sm font-semibold leading-tight">
+                  A <span className="font-bold text-white">{retractedToast.category}</span> report in {retractedToast.locationName} was retracted by the reporter.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Upper Header Status & Brand banner */}
         <header className="p-4 bg-white border-b border-slate-100/80 flex items-center justify-between" id="app-header">
           <div className="flex items-center gap-2">
@@ -1075,6 +1128,7 @@ export default function App() {
                   currentUserProfile={currentUserProfile}
                   onOpenReportWizard={() => setIsReporting(true)}
                   onVote={handleVote}
+                  onRetractReport={handleRetractReport}
                 />
               )}
 

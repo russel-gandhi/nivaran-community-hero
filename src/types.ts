@@ -44,7 +44,7 @@ export interface Report {
   lng?: number;
   address?: string;
   buildingId?: string; // building_id for flat/common_area
-  status: 'open' | 'in_progress' | 'resolved';
+  status: 'open' | 'in_progress' | 'resolved' | 'retracted';
   severity: number; // 1-5
   confidence: number; // 0-100
   createdAt: string;

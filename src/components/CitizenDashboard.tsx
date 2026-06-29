@@ -7,19 +7,21 @@ interface CitizenDashboardProps {
   currentUserProfile: UserProfile | null;
   onOpenReportWizard: () => void;
   onVote: (reportId: string, type: 'still_broken' | 'fixed') => void;
+  onRetractReport: (reportId: string, tier: string) => void;
 }
 
-export default function CitizenDashboard({ reports, currentUserProfile, onOpenReportWizard, onVote }: CitizenDashboardProps) {
+export default function CitizenDashboard({ reports, currentUserProfile, onOpenReportWizard, onVote, onRetractReport }: CitizenDashboardProps) {
   const [activeTab, setActiveTab] = useState<'my_reports' | 'verify_nearby' | 'history'>('my_reports');
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'photo' | 'video' | 'audio'; title: string; description: string } | null>(null);
+  const [confirmRetractId, setConfirmRetractId] = useState<string | null>(null);
 
   // Filter current user's active reports
-  const myReports = reports.filter(r => r.reporterId === currentUserProfile?.id && r.status !== 'resolved');
+  const myReports = reports.filter(r => r.reporterId === currentUserProfile?.id && r.status !== 'resolved' && r.status !== 'retracted');
 
   // Filter nearby active reports
   const nearbyReports = reports.filter(r => {
     if (r.reporterId === currentUserProfile?.id) return false;
-    if (r.status === 'resolved') return false;
+    if (r.status === 'resolved' || r.status === 'retracted') return false;
 
     if (r.tier === 'public') return true;
     if (r.tier === 'common_area' && r.buildingId === currentUserProfile?.registeredBuildingId) return true;
@@ -29,13 +31,13 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
 
   // History reports for current user
   const historyPrivateBuilding = reports.filter(r => 
-    r.status === 'resolved' && 
+    (r.status === 'resolved' || (r.status === 'retracted' && r.reporterId === currentUserProfile?.id)) && 
     (r.tier === 'flat' || r.tier === 'common_area') && 
     (r.reporterId === currentUserProfile?.id || r.buildingId === currentUserProfile?.registeredBuildingId)
   );
   
   const historyPublic = reports.filter(r => 
-    r.status === 'resolved' && 
+    (r.status === 'resolved' || (r.status === 'retracted' && r.reporterId === currentUserProfile?.id)) && 
     r.tier === 'public'
   );
 
@@ -46,12 +48,14 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
     return 'bg-yellow-50 text-yellow-800 border-yellow-100';
   };
 
-  const getStatusBadge = (status: 'open' | 'in_progress' | 'resolved') => {
+  const getStatusBadge = (status: 'open' | 'in_progress' | 'resolved' | 'retracted') => {
     switch (status) {
       case 'resolved':
         return <span className="text-[10px] font-black text-green-700 bg-green-50 border border-green-100 px-2 py-0.5 rounded-md flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Resolved</span>;
       case 'in_progress':
         return <span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md flex items-center gap-1"><Clock className="w-3 h-3" /> In Progress</span>;
+      case 'retracted':
+        return <span className="text-[10px] font-black text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1"><X className="w-3 h-3" /> Retracted</span>;
       default:
         return <span className="text-[10px] font-black text-orange-700 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-md flex items-center gap-1"><Clock className="w-3 h-3" /> Open</span>;
     }
@@ -194,6 +198,36 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                     </p>
                   </div>
                 )}
+                
+                <div className="flex justify-end pt-1">
+                  {confirmRetractId === report.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500 font-bold">Retract?</span>
+                      <button 
+                        onClick={() => {
+                          setConfirmRetractId(null);
+                          onRetractReport(report.id, report.tier);
+                        }}
+                        className="text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded shadow-sm"
+                      >
+                        Yes
+                      </button>
+                      <button 
+                        onClick={() => setConfirmRetractId(null)}
+                        className="text-[10px] font-bold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setConfirmRetractId(report.id)}
+                      className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                    >
+                      Retract my report
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -348,6 +382,38 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                         </div>
                         {getStatusBadge(report.status)}
                       </div>
+                      
+                      {report.reporterId === currentUserProfile?.id && report.status !== 'retracted' && (
+                        <div className="flex justify-end pt-1">
+                          {confirmRetractId === report.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-500 font-bold">Retract?</span>
+                              <button 
+                                onClick={() => {
+                                  setConfirmRetractId(null);
+                                  onRetractReport(report.id, report.tier);
+                                }}
+                                className="text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded shadow-sm"
+                              >
+                                Yes
+                              </button>
+                              <button 
+                                onClick={() => setConfirmRetractId(null)}
+                                className="text-[10px] font-bold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setConfirmRetractId(report.id)}
+                              className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                            >
+                              Retract my report
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -373,6 +439,38 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                         </div>
                         {getStatusBadge(report.status)}
                       </div>
+                      
+                      {report.reporterId === currentUserProfile?.id && report.status !== 'retracted' && (
+                        <div className="flex justify-end pt-1">
+                          {confirmRetractId === report.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-500 font-bold">Retract?</span>
+                              <button 
+                                onClick={() => {
+                                  setConfirmRetractId(null);
+                                  onRetractReport(report.id, report.tier);
+                                }}
+                                className="text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded shadow-sm"
+                              >
+                                Yes
+                              </button>
+                              <button 
+                                onClick={() => setConfirmRetractId(null)}
+                                className="text-[10px] font-bold text-slate-600 hover:bg-slate-100 px-2 py-1 rounded"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setConfirmRetractId(report.id)}
+                              className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                            >
+                              Retract my report
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
