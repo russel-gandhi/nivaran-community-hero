@@ -8,6 +8,7 @@ import ManagerDashboard from './components/ManagerDashboard';
 import PublicMap from './components/PublicMap';
 import LeaderboardView from './components/LeaderboardView';
 import ReportIssueWizard from './components/ReportIssueWizard';
+import ResolutionWizard from './components/ResolutionWizard';
 import { Trophy, Map as MapIcon, LayoutGrid, Building2, User2, ShieldCheck, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
 import { setAccessToken } from './lib/auth';
 import BuildingAutocomplete from './components/BuildingAutocomplete';
@@ -89,6 +90,7 @@ export default function App() {
     }
   }, []);
   const [isReporting, setIsReporting] = useState(false);
+  const [verifyingResolutionReport, setVerifyingResolutionReport] = useState<any | null>(null);
 
   // Firestore Sync States
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
@@ -390,32 +392,34 @@ export default function App() {
 
       const reportData = reportSnap.data();
       const voters = reportData.votedUserIds || [];
-
-      // Double vote prevention
       const votingUser = sessionUserId || 'anonymous';
+
+      if (type === 'fixed') {
+        const resolvedByList = reportData.resolvedByList || [];
+        if (resolvedByList.includes(votingUser)) return; // already submitted proof
+        
+        // Show the ResolutionWizard
+        setVerifyingResolutionReport({ id: reportId, ...reportData });
+        return;
+      }
+
+      // Double vote prevention for 'still_broken'
       if (voters.includes(votingUser)) return;
       voters.push(votingUser);
 
-      if (type === 'fixed') {
-        await updateDoc(reportRef, {
-          status: 'resolved',
-          votedUserIds: voters
-        });
-      } else {
-        // Apply severity update and confirmations for 'still_broken'
-        const baseSeverity = reportData.severity || 3;
-        const confirmations = (reportData.confirmationsCount || 1) + 1;
-        
-        // Recurrence bump: +1 severity per 3 confirmations, capped at +2
-        const recurrenceBump = Math.min(2, Math.floor((confirmations - 1) / 3));
-        const finalSeverity = Math.min(5, baseSeverity + recurrenceBump);
+      // Apply severity update and confirmations for 'still_broken'
+      const baseSeverity = reportData.severity || 3;
+      const confirmations = (reportData.confirmationsCount || 1) + 1;
+      
+      // Recurrence bump: +1 severity per 3 confirmations, capped at +2
+      const recurrenceBump = Math.min(2, Math.floor((confirmations - 1) / 3));
+      const finalSeverity = Math.min(5, baseSeverity + recurrenceBump);
 
-        await updateDoc(reportRef, {
-          confirmationsCount: increment(1),
-          severity: finalSeverity,
-          votedUserIds: voters
-        });
-      }
+      await updateDoc(reportRef, {
+        confirmationsCount: increment(1),
+        severity: finalSeverity,
+        votedUserIds: voters
+      });
 
       // Award points (+15 XP for active verification)
       if (currentUserProfile && votingUser !== 'anonymous') {
@@ -426,6 +430,86 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error processing community vote:', err);
+    }
+  };
+
+  const handleResolutionProofSubmit = async (evidenceUrl: string, evidenceType: 'photo' | 'video' | 'audio') => {
+    if (!verifyingResolutionReport || !sessionUserId) return;
+    
+    // In a real app we'd show a loading state here while verifying
+    try {
+      const response = await fetch('/api/verify-evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: verifyingResolutionReport.categoryName,
+          subtag: verifyingResolutionReport.subtag,
+          description: verifyingResolutionReport.description,
+          evidenceUrl,
+          evidenceType,
+          verificationMode: 'resolution'
+        })
+      });
+      
+      const verification = await response.json();
+      
+      if (verification.is_valid_issue && verification.confidence >= 60) {
+        // Proof accepted
+        const reportRef = doc(db, 'reports', verifyingResolutionReport.id);
+        const reportSnap = await getDoc(reportRef);
+        if (!reportSnap.exists()) return;
+        const reportData = reportSnap.data();
+        
+        const resolvedByList = reportData.resolvedByList || [];
+        if (!resolvedByList.includes(sessionUserId)) {
+          resolvedByList.push(sessionUserId);
+        }
+
+        const updates: any = {
+          resolvedByList,
+          resolution_proofs: resolvedByList.length
+        };
+
+        const batch = writeBatch(db);
+
+        if (resolvedByList.length >= 3) {
+          updates.status = 'resolved';
+          
+          // Send email if it's flat or common area
+          if (reportData.tier === 'flat' || reportData.tier === 'common_area') {
+            await fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: currentUserProfile?.email, // Should ideally be original reporter's email, but we don't have it easily available on client unless we look up user. We'll send to current user for demo.
+                reportSubtag: reportData.subtag,
+                status: 'resolved'
+              })
+            }).catch(console.error);
+          }
+          
+          // Original reporter bonus
+          if (reportData.reporterId) {
+            const reporterRef = doc(db, 'users', reportData.reporterId);
+            batch.update(reporterRef, { points: increment(50) });
+          }
+        }
+        
+        batch.update(reportRef, updates);
+        
+        // Award points to the verifier
+        const userRef = doc(db, 'users', sessionUserId);
+        batch.update(userRef, { points: increment(20) });
+        
+        await batch.commit();
+        setVerifyingResolutionReport(null);
+        alert('Resolution proof accepted! Thank you.');
+      } else {
+        alert('Proof rejected: ' + (verification.rejection_reason || 'Evidence does not show issue is resolved.'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error verifying resolution evidence.');
     }
   };
 
@@ -1054,6 +1138,15 @@ export default function App() {
               <span className="text-[9px] font-bold">Leaderboard</span>
             </button>
           </nav>
+        )}
+
+        {/* Resolution Wizard Overlay */}
+        {verifyingResolutionReport && (
+          <ResolutionWizard 
+            report={verifyingResolutionReport} 
+            onCancel={() => setVerifyingResolutionReport(null)} 
+            onSubmit={handleResolutionProofSubmit} 
+          />
         )}
       </div>
     </div>

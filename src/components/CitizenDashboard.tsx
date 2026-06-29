@@ -212,6 +212,7 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
           ) : (
             nearbyReports.map((report) => {
               const hasVoted = report.votedUserIds?.includes(currentUserProfile?.id || 'anonymous') || false;
+              const hasSubmittedResolution = report.resolvedByList?.includes(currentUserProfile?.id || 'anonymous') || false;
 
               return (
                 <div key={report.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs space-y-3" id={`nearby-report-${report.id}`}>
@@ -280,7 +281,11 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                       Confirmations: <strong>{report.confirmationsCount}</strong>
                     </span>
 
-                    {hasVoted ? (
+                    {hasSubmittedResolution ? (
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-md">
+                        ✓ Resolution proof accepted (+20 XP)
+                      </span>
+                    ) : hasVoted ? (
                       <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-md">
                         ✓ Verification count added (+15 XP)
                       </span>

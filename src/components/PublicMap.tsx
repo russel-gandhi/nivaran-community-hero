@@ -387,7 +387,8 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
                     onVote(promptReport.id, 'fixed');
                     setDismissedPrompts(prev => new Set(prev).add(promptReport.id));
                   }}
-                  className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold py-2 rounded-xl border border-green-200 transition-colors"
+                  disabled={promptReport.resolvedByList?.includes(currentUserProfile?.id || '')}
+                  className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold py-2 rounded-xl border border-green-200 transition-colors disabled:opacity-50"
                 >
                   No, it's fixed
                 </button>
@@ -494,7 +495,7 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
                   // Quick update client side
                   setSelectedReport(prev => prev ? { ...prev, confirmationsCount: prev.confirmationsCount + 1 } : null);
                 }}
-                disabled={currentUserProfile?.id === selectedReport.reporterId || selectedReport.status === 'resolved'}
+                disabled={currentUserProfile?.id === selectedReport.reporterId || selectedReport.status === 'resolved' || (selectedReport.votedUserIds?.includes(currentUserProfile?.id || ''))}
                 className="flex items-center gap-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-1.5 rounded-md border border-red-200/50 disabled:opacity-50"
                 title="Confirm the issue is still active"
               >
@@ -504,15 +505,13 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
               <button
                 onClick={() => {
                   onVote(selectedReport.id, 'fixed');
-                  // Quick update client side
-                  setSelectedReport(prev => prev ? { ...prev, confirmationsCount: prev.confirmationsCount + 1 } : null);
                 }}
-                disabled={currentUserProfile?.id === selectedReport.reporterId || selectedReport.status === 'resolved'}
+                disabled={currentUserProfile?.id === selectedReport.reporterId || selectedReport.status === 'resolved' || (selectedReport.resolvedByList?.includes(currentUserProfile?.id || ''))}
                 className="flex items-center gap-1 text-[10px] bg-green-50 hover:bg-green-100 text-green-700 font-bold px-2 py-1.5 rounded-md border border-green-200/50 disabled:opacity-50"
-                title="Confirm the issue has been resolved"
+                title={selectedReport.resolvedByList?.includes(currentUserProfile?.id || '') ? "Resolution proof submitted" : "Confirm the issue has been resolved"}
               >
                 <ThumbsUp className="w-3 h-3" />
-                Fixed
+                {selectedReport.resolvedByList?.includes(currentUserProfile?.id || '') ? 'Fixed (Proof Sent)' : 'Fixed'}
               </button>
             </div>
           </div>

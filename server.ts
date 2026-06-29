@@ -117,7 +117,8 @@ Ensure you return ONLY JSON. No markdown wrappers except possibly \`\`\`json.`;
 // 2. Multimodal Verification Agent (Step 5)
 app.post('/api/verify-evidence', async (req, res) => {
   try {
-    const { category, subtag, description, evidenceUrl, evidenceType } = req.body;
+    const { category, subtag, description, evidenceUrl, evidenceType, verificationMode } = req.body;
+    const isResolution = verificationMode === 'resolution';
 
     if (!evidenceUrl) {
       return res.status(400).json({ error: 'Evidence URL/base64 is required.' });
@@ -135,7 +136,22 @@ app.post('/api/verify-evidence', async (req, res) => {
     const isSimulated = parsedEvidence.data === 'UklGRi4AAABXQVZFRm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=' || parsedEvidence.data.length < 100;
 
     if (evidenceType === 'audio' || parsedEvidence.mimeType.startsWith('audio/')) {
-      textPrompt = `You are a professional acoustic forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+      if (isResolution) {
+        textPrompt = `You are a professional acoustic forensic verification agent for "Nivaran".
+The citizen has submitted an audio clip proving that a noise grievance has been RESOLVED.
+Original Category: "${category}"
+Original Subtag: "${subtag}"
+Original Description: "${description || 'No description provided.'}"
+
+${isSimulated ? `⚠️ METADATA NOTE: This is a simulated/dummy audio sample. Assume the audio confirms the noise is GONE based on standard quiet ambient noise.` : ''}
+
+CRITICAL PROTOCOLS:
+Analyze if the audio proves the noise is absent.
+If it is absent (normal room silence), set is_valid_issue=true, confidence>60, rejection_reason=null.
+If the noise is still present, set is_valid_issue=false, confidence>60, rejection_reason="Noise is still audible."
+`;
+      } else {
+        textPrompt = `You are a professional acoustic forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
 The citizen has submitted a noise grievance under:
 - Category: "${category}"
 - Subtag: "${subtag}"
@@ -160,26 +176,26 @@ CRITICAL ACOUSTIC VERIFICATION PROTOCOLS:
    - If the audio contains distinct, audible Active Construction / Nuisance Noise aligning with the citizen's description:
      * Set "is_valid_issue" to true.
      * Set "confidence" to 85-100% depending on clarity.
-     * Set "detected_subtag" to the subtag. If the subtag is slightly mismatched (e.g., they claimed "Drilling" but you hear "Loud Music"), auto-correct the "detected_subtag" to the correct noise subtag.
-     * Set "rejection_reason" to null.
-     * Select "severity_hint" from 1 to 5 (e.g., continuous drilling/sawing = 4 or 5, occasional banging = 2 or 3).
-
-OUTPUT FORMAT SPECIFICATION:
-You must respond with raw JSON matching this TypeScript structure:
-{
-  "is_valid_issue": boolean,
-  "confidence": number, // integer 0-100
-  "detected_subtag": "string", // name of aligned subtag
-  "severity_hint": number, // 1 to 5
-  "reasoning": "Provide an extremely rigorous, acoustic analysis breakdown including: 1) Estimated Acoustic Profile (continuous vs transient, low/high frequency range), 2) Signal-to-Noise evaluation compared to standard ambient baselines, and 3) Aligned context verification. Summarize it always in less than 100 words.",
-  "rejection_reason": "string describing why it was rejected, or null if accepted"
-}
-
-Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+     * Set "detected_subtag" to the subtag. If the subtag is slightly mismatched (e.g., they claimed "Drilling" but you hear "Loud Music"), auto-correct the "detected_subtag" to the correct noise      * Set "rejection_reason" to null.
+     * Select "severity_hint" from 1 to 5 (e.g., continuous drilling/sawing = 4 or 5, occasional banging = 2 or 3).`;
+      }
     } else if (evidenceType === 'video' || parsedEvidence.mimeType.startsWith('video/')) {
-      textPrompt = `You are a professional video forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+      if (isResolution) {
+        textPrompt = `You are a professional video forensic verification agent for "Nivaran".
+The citizen has submitted a video proving that an issue has been RESOLVED.
+Original Category: "${category}"
+Original Subtag: "${subtag}"
+Original Description: "${description || 'No description provided.'}"
+
+CRITICAL PROTOCOLS:
+Analyze if the video proves the issue is fixed (e.g., clean street, patched pothole).
+If it is fixed, set is_valid_issue=true, confidence>60, rejection_reason=null.
+If the issue is still clearly visible, set is_valid_issue=false, confidence>60, rejection_reason="Issue is still visible."
+`;
+      } else {
+        textPrompt = `You are a professional video forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
 The citizen has submitted video evidence under:
-- Category: "${category}"
+- Category: "${category}"tegory}"
 - Subtag: "${subtag}"
 - Description: "${description || 'No description provided.'}"
 
@@ -206,22 +222,23 @@ CRITICAL VIDEO VERIFICATION PROTOCOLS:
      * Set "confidence" to 85-100%.
      * Set "detected_subtag" to the original subtag.
      * Set "rejection_reason" to null.
-     * Set "severity_hint" from 1 to 5 based on the visual magnitude of the hazard.
-
-OUTPUT FORMAT SPECIFICATION:
-You must respond with raw JSON matching this TypeScript structure:
-{
-  "is_valid_issue": boolean,
-  "confidence": number, // integer 0-100
-  "detected_subtag": "string",
-  "severity_hint": number, // 1 to 5
-  "reasoning": "Provide an extremely rigorous, visual analysis breakdown including: 1) Dynamic/Static Elements Observed, 2) Environmental & Spatial Background match (such as street, corridor, plumbing duct), and 3) Verification of authentic grievance indicators. Summarize it always in less than 100 words.",
-  "rejection_reason": "string describing why it was rejected, or null if accepted"
-}
-
-Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+     * Set "severity_hint" from 1 to 5 based on the visual magnitude of the hazard.`;
+      }
     } else {
-      textPrompt = `You are a professional visual inspector and forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
+      if (isResolution) {
+        textPrompt = `You are a professional visual inspector and forensic verification agent for "Nivaran".
+The citizen has submitted a photo proving that an issue has been RESOLVED.
+Original Category: "${category}"
+Original Subtag: "${subtag}"
+Original Description: "${description || 'No description provided.'}"
+
+CRITICAL PROTOCOLS:
+Analyze if the photo proves the issue is fixed (e.g., clean street, patched pothole).
+If it is fixed, set is_valid_issue=true, confidence>60, rejection_reason=null.
+If the issue is still clearly visible, set is_valid_issue=false, confidence>60, rejection_reason="Issue is still visible in the photo."
+`;
+      } else {
+        textPrompt = `You are a professional visual inspector and forensic verification agent for "Nivaran", a smart hyperlocal civic/building grievance platform.
 The citizen has submitted photo evidence under:
 - Category: "${category}"
 - Subtag: "${subtag}"
@@ -249,9 +266,25 @@ CRITICAL PHOTO VERIFICATION PROTOCOLS:
      * Set "confidence" to 85-100%.
      * Set "detected_subtag" to the original subtag.
      * Set "rejection_reason" to null.
-     * Set "severity_hint" from 1 to 5 (e.g., major wall seepage with structural damage = 4 or 5, minor peeling paint = 1 or 2).
+     * Set "severity_hint" from 1 to 5 (e.g., major wall seepage with structural damage = 4 or 5, minor peeling paint = 1 or 2).`;
+      }
+    }
 
-OUTPUT FORMAT SPECIFICATION:
+    if (isResolution) {
+      textPrompt += `\n\nOUTPUT FORMAT SPECIFICATION:
+You must respond with raw JSON matching this TypeScript structure:
+{
+  "is_valid_issue": boolean,
+  "confidence": number, // integer 0-100
+  "detected_subtag": "string",
+  "severity_hint": number, // 1 to 5
+  "reasoning": "Explain your analysis",
+  "rejection_reason": "string describing why it was rejected, or null if accepted"
+}
+
+Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+    } else {
+      textPrompt += `\n\nOUTPUT FORMAT SPECIFICATION:
 You must respond with raw JSON matching this TypeScript structure:
 {
   "is_valid_issue": boolean,

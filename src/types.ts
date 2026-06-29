@@ -54,9 +54,11 @@ export interface Report {
   rejectionReason?: string;
   detectedSubtag?: string;
   // Track who voted
-  votedUserIds?: string[]; // to prevent double voting on "still broken" or "fixed"
+  votedUserIds?: string[]; // to prevent double voting on "still broken"
   organizingFix?: boolean;
   fixParticipants?: string[];
+  resolvedByList?: string[];
+  resolution_proofs?: number;
 }
 
 export interface RoutingLog {
