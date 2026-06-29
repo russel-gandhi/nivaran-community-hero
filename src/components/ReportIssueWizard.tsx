@@ -20,6 +20,21 @@ const hammingDistance = (hash1: string, hash2: string) => {
   return diff;
 };
 
+const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // metres
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+          Math.cos(φ1) * Math.cos(φ2) *
+          Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c;
+};
+
 interface ReportIssueWizardProps {
   currentUserProfile: UserProfile | null;
   onIssueReported: (pointsEarned: number) => void;
@@ -40,6 +55,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   const [evidenceUrl, setEvidenceUrl] = useState<string>('');
   const [evidenceMetadata, setEvidenceMetadata] = useState<{ lat?: number; lng?: number; timestamp?: number } | undefined>();
   const [imageHash, setImageHash] = useState<string | undefined>();
+  const [captureLocation, setCaptureLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [evidenceType, setEvidenceType] = useState<'photo' | 'video' | 'audio'>('photo');
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -173,6 +189,15 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
       setEvidenceMetadata(undefined);
     }
     setImageHash(hash);
+    
+    // Capture browser GPS separately from metadata
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setCaptureLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+      }, (err) => {
+        console.warn('Browser GPS capture failed:', err);
+      });
+    }
   };
 
   const runVerificationAgent = async () => {
@@ -366,6 +391,20 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
 
       // Write report to Firestore
       const hasMetadataCoords = evidenceMetadata?.lat !== undefined && evidenceMetadata?.lng !== undefined;
+      let distanceIsImplausible = false;
+      if (captureLocation) {
+        if (selectedTier === 'public' && hasMetadataCoords) {
+          const dist = getDistanceMeters(captureLocation.lat, captureLocation.lng, evidenceMetadata!.lat!, evidenceMetadata!.lng!);
+          if (dist > 500) distanceIsImplausible = true;
+        } else if ((selectedTier === 'flat' || selectedTier === 'common_area') && selectedBuildingId) {
+          const bld = buildings.find(b => b.id === selectedBuildingId);
+          if (bld) {
+            const dist = getDistanceMeters(captureLocation.lat, captureLocation.lng, bld.lat, bld.lng);
+            if (dist > 500) distanceIsImplausible = true;
+          }
+        }
+      }
+
       const newReport: Omit<Report, 'id'> = {
         reporterId: currentUserProfile?.id || 'anonymous',
         reporterName: currentUserProfile?.name || 'Anonymous Citizen',
@@ -385,7 +424,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         confirmationsCount: 1,
         reasoning: verificationResult?.reasoning || 'Automatically ingested.',
         votedUserIds: [currentUserProfile?.id || 'anonymous'],
-        lowMetadataConfidence: !hasMetadataCoords,
+        lowMetadataConfidence: !hasMetadataCoords || distanceIsImplausible,
         lat: evidenceMetadata?.lat,
         lng: evidenceMetadata?.lng,
         imageHash: imageHash,
