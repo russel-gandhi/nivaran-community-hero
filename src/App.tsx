@@ -345,10 +345,8 @@ export default function App() {
   const handleGoogleLogin = async (role: 'citizen' | 'manager' = 'citizen') => {
     try {
       const provider = new GoogleAuthProvider();
-      // Only request sensitive scopes if logging in as manager
-      if (role === 'manager') {
-        provider.addScope('https://www.googleapis.com/auth/gmail.send');
-      }
+      // Always request gmail.send scope so both citizens and managers can trigger notifications when reports are raised or resolved
+      provider.addScope('https://www.googleapis.com/auth/gmail.send');
       provider.addScope('https://www.googleapis.com/auth/spreadsheets');
       
       // Force account selection to allow easily switching accounts during testing
@@ -1326,6 +1324,7 @@ export default function App() {
               currentUserProfile={currentUserProfile}
               onIssueReported={handleIssueReported}
               onCancel={() => setIsReporting(false)}
+              accessToken={accessTokenState}
             />
           ) : currentRole === 'admin' ? (
             <AdminDashboard />

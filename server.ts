@@ -574,6 +574,34 @@ app.post('/api/send-email', async (req, res) => {
           <a href="${actionUrl}&confirm=yes" style="display:inline-block; padding: 10px 20px; background: #dc2626; color: #fff; text-decoration: none; border-radius: 5px;">Yes, still a problem</a>
         </div>
       `;
+    } else if (type === 'new_report_citizen') {
+      messageText = `Thank you for filing your report! Your ${category} issue has been successfully received and routed.\n\nReference ID: ${reportId}`;
+      messageHtml = `
+        <div style="font-family: sans-serif; padding: 20px; color: #334155;">
+          <h2 style="color: #f97316;">Issue Reported Successfully</h2>
+          <p>Hi there,</p>
+          <p>Thank you for contributing to the community! Your report for <strong>${category}</strong> has been successfully received and routed.</p>
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <p style="margin: 0;"><strong>Reference ID:</strong> <span style="font-family: monospace; color: #f97316; font-weight: bold;">${reportId}</span></p>
+            <p style="margin: 5px 0 0 0;"><strong>Category:</strong> ${category}</p>
+          </div>
+          <p>You can track the progress of this ticket directly on your dashboard.</p>
+        </div>
+      `;
+    } else if (type === 'new_report_manager') {
+      messageText = `A new building issue has been reported: ${category}. Please review it on your dashboard.\n\nReference ID: ${reportId}`;
+      messageHtml = `
+        <div style="font-family: sans-serif; padding: 20px; color: #334155;">
+          <h2 style="color: #f97316;">New Issue Notification</h2>
+          <p>Hello Manager,</p>
+          <p>A resident has reported a new building-related issue: <strong>${category}</strong>.</p>
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin: 15px 0;">
+            <p style="margin: 0;"><strong>Reference ID:</strong> <span style="font-family: monospace; color: #f97316; font-weight: bold;">${reportId}</span></p>
+            <p style="margin: 5px 0 0 0;"><strong>Category:</strong> ${category}</p>
+          </div>
+          <p>Please log in to your Manager Dashboard to view details, inspect evidence, and assign resolving personnel.</p>
+        </div>
+      `;
     }
 
     const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;

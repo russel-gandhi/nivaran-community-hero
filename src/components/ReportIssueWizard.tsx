@@ -39,9 +39,10 @@ interface ReportIssueWizardProps {
   currentUserProfile: UserProfile | null;
   onIssueReported: (pointsEarned: number) => void;
   onCancel: () => void;
+  accessToken?: string | null;
 }
 
-export default function ReportIssueWizard({ currentUserProfile, onIssueReported, onCancel }: ReportIssueWizardProps) {
+export default function ReportIssueWizard({ currentUserProfile, onIssueReported, onCancel, accessToken }: ReportIssueWizardProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -652,9 +653,56 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         subtag: newReport.subtag
       });
 
+      // Send Email Notifications
+      if (accessToken) {
+        // 1. Send to Citizen (Reporter)
+        if (currentUserProfile?.email) {
+          try {
+            await fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                accessToken,
+                to: currentUserProfile.email,
+                subject: `Your Nivaran report was successfully received — Ref ID: ${routeData.referenceId}`,
+                type: 'new_report_citizen',
+                reportId: routeData.referenceId,
+                category: selectedCategory?.name || 'Civic Issue',
+              })
+            });
+          } catch (emailErr) {
+            console.error('Failed to send citizen notification:', emailErr);
+          }
+        }
+
+        // 2. Send to Manager (if building is relevant)
+        if (selectedTier !== 'public' && selectedBuildingId) {
+          const currentBuilding = buildings.find(b => b.id === selectedBuildingId);
+          if (currentBuilding?.managerEmail) {
+            try {
+              await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  accessToken,
+                  to: currentBuilding.managerEmail,
+                  subject: `[New Issue] ${selectedCategory?.name || 'Building Issue'} - Ref ID: ${routeData.referenceId}`,
+                  type: 'new_report_manager',
+                  reportId: routeData.referenceId,
+                  category: selectedCategory?.name || 'Building Issue',
+                })
+              });
+            } catch (emailErr) {
+              console.error('Failed to send manager notification:', emailErr);
+            }
+          }
+        }
+      }
+
       setStep(7); // Show routed success screen
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error ingesting report:', err);
+      setErrorMsg(err.message || 'Failed to ingest and route the issue. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -1384,6 +1432,12 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
               📍 Severity Level Suggested: {verificationResult?.severity_hint || selectedCategory?.baseSeverity}/5
             </div>
           </div>
+
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200/60 p-3 rounded-xl text-xs text-red-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+            </div>
+          )}
 
           <button
             onClick={processReportIngestion}
