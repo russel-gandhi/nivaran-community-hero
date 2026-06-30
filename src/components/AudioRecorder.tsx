@@ -37,7 +37,16 @@ export default function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
-        setRecordTime(prev => prev + 1);
+        setRecordTime(prev => {
+          if (prev >= 9) {
+            // Automatically stop recording at 10 seconds to prevent massive file sizes
+            setTimeout(() => {
+              stopRecording();
+            }, 0);
+            return 10;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } else {
       clearInterval(timerRef.current);
@@ -158,6 +167,10 @@ export default function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (file.size > 800 * 1024) {
+        alert("Please upload an audio file under 800KB. Large audio files cannot be processed due to database limits.");
+        return;
+      }
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
 
@@ -217,6 +230,10 @@ export default function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         throw new Error('Failed to download file from Google Drive');
       }
       const blob = await res.blob();
+      if (blob.size > 800 * 1024) {
+        alert("The selected audio file from Google Drive exceeds the 800KB limit for database storage. Please select a smaller file.");
+        return;
+      }
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
 
@@ -272,7 +289,7 @@ export default function AudioRecorder({ onAudioCaptured }: AudioRecorderProps) {
         ) : (
           <div className="flex flex-col items-center text-slate-400">
             <Mic className="w-8 h-8 mb-1.5 text-slate-300" />
-            <p className="text-xs">Provide a noise sample of the construction nuisance</p>
+            <p className="text-xs text-center">Provide a noise sample of the construction nuisance (Max 10s)</p>
           </div>
         )}
       </div>

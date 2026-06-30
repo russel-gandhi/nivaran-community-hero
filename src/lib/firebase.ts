@@ -5,7 +5,7 @@ import { getMessaging, isSupported } from 'firebase/messaging';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, 'ai-studio-0578757c-fca5-4e28-a2cc-68b64af870d1');
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 export const getFirebaseMessaging = async () => {

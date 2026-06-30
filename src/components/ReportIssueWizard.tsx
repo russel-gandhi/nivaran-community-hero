@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, increment, query, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import { Category, Report, UserProfile, Building } from '../types';
-import EvidenceUploader from './EvidenceUploader';
+import EvidenceUploader, { resizeAndCompressImage } from './EvidenceUploader';
 import AudioRecorder from './AudioRecorder';
 import { ChevronRight, ChevronLeft, ShieldAlert, AlertTriangle, CheckCircle, Sparkles, AlertCircle, RefreshCw, Award } from 'lucide-react';
 
@@ -603,6 +603,37 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
 
       if (selectedTier !== 'public' && selectedBuildingId) {
         newReport.buildingId = selectedBuildingId;
+      }
+
+      // Fail-safe compression check to guarantee staying under 1MB Firestore limit
+      try {
+        const serialized = JSON.stringify(newReport);
+        const sizeBytes = new Blob([serialized]).size;
+        console.log('Constructed report payload size:', sizeBytes, 'bytes');
+
+        if (sizeBytes > 950 * 1024) {
+          console.warn('Report payload is too large. Triggering automatic fallback compression...');
+          if (evidenceType === 'photo' && newReport.evidenceUrl && newReport.evidenceUrl.startsWith('data:image/')) {
+            // Compress extremely down to 320x320 at 0.35 quality
+            const superCompressed = await resizeAndCompressImage(newReport.evidenceUrl, 320, 320, 0.35);
+            newReport.evidenceUrl = superCompressed;
+          }
+          
+          // Re-evaluate size
+          const reSerialized = JSON.stringify(newReport);
+          const reSize = new Blob([reSerialized]).size;
+          console.log('Report size after photo compression:', reSize, 'bytes');
+
+          if (reSize > 950 * 1024) {
+            // If still too large, let's drop voiceDescriptionUrl to guarantee report creation
+            if (newReport.voiceDescriptionUrl) {
+              newReport.voiceDescriptionUrl = '';
+              newReport.description += " (Voice recording omitted to fit database storage limit)";
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Fail-safe compression logic encountered an error:', err);
       }
 
       const docRef = await addDoc(collection(db, 'reports'), newReport);

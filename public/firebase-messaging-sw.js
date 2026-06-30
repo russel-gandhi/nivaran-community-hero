@@ -4,6 +4,8 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 firebase.initializeApp({
   "projectId": "thinking-replica-kdckx",
   "appId": "1:513568260262:web:a123a241046cba746af467",
+  // Note: Firebase API keys are public by design to identify your project to Firebase servers. 
+  // Security is handled by Firestore Security Rules, not by keeping this key secret.
   "apiKey": "AIzaSyDFoAoXXpPwhIxTyrMIi9gCAog2HSO0O10",
   "authDomain": "thinking-replica-kdckx.firebaseapp.com",
   "storageBucket": "thinking-replica-kdckx.firebasestorage.app",

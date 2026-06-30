@@ -229,11 +229,11 @@ export default function App() {
           }
         }, (err) => {
           console.warn('Error in user snapshot, falling back:', err.message || err);
-          setIsOfflineMode(true);
+          // setIsOfflineMode(true);
         });
       } catch (err: any) {
         console.warn('Error syncing user profile:', err.message || err);
-        setIsOfflineMode(true);
+        // setIsOfflineMode(true);
       } finally {
         setLoading(false);
       }
@@ -251,7 +251,7 @@ export default function App() {
       setAllProfiles(list);
     }, (err) => {
       console.warn('Error syncing all profiles, using default:', err.message || err);
-      setIsOfflineMode(true);
+      // setIsOfflineMode(true);
       setAllProfiles([
         {
           id: 'u-demo',
@@ -334,7 +334,7 @@ export default function App() {
       setLoading(false);
     }, (err) => {
       console.warn('Error syncing reports, entering sandbox/fallback mode:', err.message || err);
-      setIsOfflineMode(true);
+      // setIsOfflineMode(true); // Temporarily disabling offline mode to let the app continue using Firebase
       setLoading(false);
       setReports([]);
     });

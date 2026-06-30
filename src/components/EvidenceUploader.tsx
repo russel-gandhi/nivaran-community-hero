@@ -37,6 +37,47 @@ const computeDHash = (base64: string): Promise<string> => {
   });
 };
 
+export const resizeAndCompressImage = (base64: string, maxWidth = 480, maxHeight = 480, quality = 0.5): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      // Keep aspect ratio
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      // Convert to JPEG with specified compression quality
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+    img.onerror = () => {
+      resolve(base64);
+    };
+    img.src = base64;
+  });
+};
+
 interface EvidenceUploaderProps {
   evidenceType: 'photo' | 'video' | 'audio';
   onEvidenceCaptured: (base64Url: string, metadata?: { lat?: number; lng?: number; timestamp?: number }, imageHash?: string) => void;
@@ -108,6 +149,15 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
   // Convert File to Base64
   const processFile = async (file: File) => {
     if (!file) return;
+
+    if (evidenceType === 'video' && file.size > 800 * 1024) {
+      alert("Please upload a shorter video file under 800KB. Large video files cannot be processed due to database limits.");
+      return;
+    }
+    if (evidenceType === 'audio' && file.size > 800 * 1024) {
+      alert("Please upload an audio file under 800KB. Large audio files cannot be processed due to database limits.");
+      return;
+    }
     
     let extractedMetadata: { lat?: number; lng?: number; timestamp?: number } | undefined;
     if (evidenceType === 'photo') {
@@ -127,7 +177,14 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const base64 = e.target?.result as string;
+      let base64 = e.target?.result as string;
+      if (evidenceType === 'photo') {
+        try {
+          base64 = await resizeAndCompressImage(base64);
+        } catch (compressErr) {
+          console.warn('Failed to compress image:', compressErr);
+        }
+      }
       setSelectedEvidence(base64);
       let imageHash: string | undefined;
       if (evidenceType === 'photo') {
@@ -212,6 +269,10 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
         throw new Error('Failed to download file from Google Drive');
       }
       const blob = await res.blob();
+      if ((evidenceType === 'video' || evidenceType === 'audio') && blob.size > 800 * 1024) {
+        alert("The selected file from Google Drive exceeds the 800KB limit for database storage. Please select a smaller/shorter file.");
+        return;
+      }
       
       let extractedMetadata: { lat?: number; lng?: number; timestamp?: number } | undefined;
       if (evidenceType === 'photo') {
@@ -231,7 +292,14 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
 
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const base64 = e.target?.result as string;
+        let base64 = e.target?.result as string;
+        if (evidenceType === 'photo') {
+          try {
+            base64 = await resizeAndCompressImage(base64);
+          } catch (compressErr) {
+            console.warn('Failed to compress image:', compressErr);
+          }
+        }
         setSelectedEvidence(base64);
         let imageHash: string | undefined;
         if (evidenceType === 'photo') {
@@ -319,7 +387,14 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
+        let dataUrl = canvas.toDataURL('image/jpeg');
+        if (evidenceType === 'photo') {
+          try {
+            dataUrl = await resizeAndCompressImage(dataUrl);
+          } catch (compressErr) {
+            console.warn('Failed to compress captured photo:', compressErr);
+          }
+        }
         setSelectedEvidence(dataUrl);
         let imageHash: string | undefined;
         if (evidenceType === 'photo') {
@@ -375,9 +450,9 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
 
       videoTimerRef.current = setInterval(() => {
         setVideoDuration(prev => {
-          if (prev >= 14) { // Limit to 15 seconds for lightweight uploads
+          if (prev >= 3) { // Limit to 4 seconds for lightweight uploads
             stopVideoRecording();
-            return 15;
+            return 4;
           }
           return prev + 1;
         });
@@ -639,7 +714,7 @@ export default function EvidenceUploader({ evidenceType, onEvidenceCaptured }: E
                     {isRecordingVideo && (
                       <div className="absolute top-2 right-2 bg-red-600 px-2 py-1 rounded text-[9px] text-white font-mono font-bold flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                        REC {formatVideoTime(videoDuration)} / 0:15
+                        REC {formatVideoTime(videoDuration)} / 0:04
                       </div>
                     )}
 

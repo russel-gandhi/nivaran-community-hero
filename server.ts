@@ -82,10 +82,12 @@ User description: "${description}"
 Ensure you return ONLY JSON. No markdown wrappers except possibly \`\`\`json.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 2000
       }
     });
 
@@ -309,10 +311,12 @@ Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or
     ];
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: { parts: contentsParts },
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 2000
       }
     });
 
@@ -434,9 +438,9 @@ app.post('/api/process-voice-description', async (req, res) => {
       }
     }
 
-    // Real audio processing with gemini-3.5-flash
+    // Real audio processing with gemini-2.5-flash
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: [
         {
           inlineData: {
@@ -474,7 +478,9 @@ Do not include any markdown backticks or wrappers like \`\`\`json.`
         }
       ],
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 2000
       }
     });
 
@@ -518,10 +524,12 @@ Output strictly as a JSON object matching this schema:
 Ensure you return ONLY JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 2000
       }
     });
 
