@@ -378,6 +378,164 @@ app.post('/api/route-report', (req, res) => {
   });
 });
 
+// Process Voice Note Description (Hindi, Marathi, etc.) using Gemini
+app.post('/api/process-voice-description', async (req, res) => {
+  try {
+    const { voiceAudio, categories, simulatedLanguage } = req.body;
+    if (!voiceAudio) {
+      return res.status(400).json({ error: 'Audio data is required' });
+    }
+
+    const parsedAudio = parseBase64DataUrl(voiceAudio);
+    if (!parsedAudio) {
+      return res.status(400).json({ error: 'Invalid audio format' });
+    }
+
+    const isSimulated = parsedAudio.data === 'UklGRi4AAABXQVZFRm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=' || parsedAudio.data.length < 100 || voiceAudio.includes('simulated-audio');
+
+    if (isSimulated) {
+      // Return high-quality localized simulations based on language selection
+      if (simulatedLanguage === 'mr') {
+        // Marathi plumbing leak with everything detected
+        return res.json({
+          originalTranscription: "आमच्या इमारतीमध्ये पाण्याच्या पाईप फुटली आहे आणि खूप पाणी वाहत आहे.",
+          englishTranslation: "A water pipe has burst in our building and a lot of water is flowing.",
+          detectedTier: "common_area",
+          detectedCategoryId: "common-plumbing",
+          detectedCategoryName: "Common plumbing/water tank",
+          detectedSubtag: "Main line leak or low water pressure",
+          missingDetails: "none",
+          followUpQuestion: null
+        });
+      } else if (simulatedLanguage === 'hi_vague') {
+        // Hindi vague - triggers the follow-up question flow!
+        return res.json({
+          originalTranscription: "भैया कुछ खराब हो गया है, जल्दी आओ ठीक करने के लिए।",
+          englishTranslation: "Brother, something is broken, please come quickly to fix it.",
+          detectedTier: null,
+          detectedCategoryId: null,
+          detectedCategoryName: null,
+          detectedSubtag: null,
+          missingDetails: "category",
+          followUpQuestion: "नमस्ते! क्या आप कृपया बता सकते हैं कि कौन सी चीज़ खराब हुई है? (जैसे नल बहना, लाइट खराब होना या लिफ्ट अटकना) ताकि हम सही टीम भेज सकें।"
+        });
+      } else {
+        // Default Hindi (Pothole/Road) - Fully detected
+        return res.json({
+          originalTranscription: "सेक्टर 62 की मुख्य सड़क पर बहुत बड़ा गड्ढा हो गया है, पानी भर गया है और गाड़ियां गिर रही हैं।",
+          englishTranslation: "There is a very large pothole on the main road of Sector 62, it is filled with water and vehicles are falling.",
+          detectedTier: "public",
+          detectedCategoryId: "public-roads",
+          detectedCategoryName: "Roads",
+          detectedSubtag: "Potholes or damaged pavement",
+          missingDetails: "none",
+          followUpQuestion: null
+        });
+      }
+    }
+
+    // Real audio processing with gemini-3.5-flash
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: [
+        {
+          inlineData: {
+            mimeType: parsedAudio.mimeType,
+            data: parsedAudio.data
+          }
+        },
+        {
+          text: `You are a multilingual AI assistant for a civic and building issue resolver app called "Nivaran".
+The attached audio clip is a citizen's voice note describing their issue in their native language (e.g. Hindi, Marathi, English, etc.).
+
+Analyze the audio clip and perform these tasks:
+1. Transcribe the audio precisely in its original language (e.g. Hindi, Marathi, Bengali, English).
+2. Translate the description into English.
+3. Match it to one of our predefined categories and subtags:
+${JSON.stringify(categories)}
+
+If the description lacks enough details to map to any Category or sub-tag, then:
+- set 'missingDetails' to "category" or "subtag".
+- formulate ONE short, polite follow-up question in the SAME language as the original voice note asking them for clarification (e.g. in Hindi or Marathi).
+- otherwise, if everything is clear, set 'missingDetails' to "none" and 'followUpQuestion' to null.
+
+Output must be strictly raw JSON format matching this schema:
+{
+  "originalTranscription": "string",
+  "englishTranslation": "string",
+  "detectedCategoryId": "string | null",
+  "detectedCategoryName": "string | null",
+  "detectedSubtag": "string | null",
+  "missingDetails": "category" | "subtag" | "none",
+  "followUpQuestion": "string | null"
+}
+
+Do not include any markdown backticks or wrappers like \`\`\`json.`
+        }
+      ],
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const responseText = response.text || '{}';
+    const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const result = JSON.parse(cleanText);
+    return res.json(result);
+
+  } catch (error: any) {
+    console.error('Error in process-voice-description API:', error);
+    res.status(500).json({ error: error.message || 'Internal server error processing audio' });
+  }
+});
+
+// Process Voice Follow-Up
+app.post('/api/process-voice-followup', async (req, res) => {
+  try {
+    const { originalTranslation, followUpQuestion, userResponse, categories } = req.body;
+    
+    const prompt = `You are a multilingual AI assistant for "Nivaran".
+The user originally reported an issue and we asked them a follow-up question in their language because some details were missing.
+
+Original Description (English translation): "${originalTranslation}"
+Follow-up Question asked: "${followUpQuestion}"
+User's Answer: "${userResponse}"
+
+Please:
+1. Translate the user's answer into English.
+2. Combine and refine the original description and the new answer into a single, cohesive English description that is clear and detailed for our maintenance teams.
+3. Classify and match this refined description to one of our available categories:
+${JSON.stringify(categories)}
+
+Output strictly as a JSON object matching this schema:
+{
+  "refinedEnglishTranslation": "string", // complete, combined, clear description in English
+  "detectedCategoryId": "string | null",
+  "detectedCategoryName": "string | null",
+  "detectedSubtag": "string | null"
+}
+
+Ensure you return ONLY JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const responseText = response.text || '{}';
+    const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const result = JSON.parse(cleanText);
+    return res.json(result);
+
+  } catch (error: any) {
+    console.error('Error in process-voice-followup:', error);
+    res.status(500).json({ error: error.message || 'Internal server error processing follow-up' });
+  }
+});
+
 // 4. Send Email Agent (Step 11 & Step 12)
 app.post('/api/send-email', async (req, res) => {
   try {

@@ -492,6 +492,21 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                       <p className="text-[11px] text-slate-600 line-clamp-3 leading-relaxed italic">
                         "{report.description || 'No description provided.'}"
                       </p>
+                      
+                      {report.voiceDescriptionUrl && (
+                        <div className="bg-slate-50 border border-slate-200/60 p-2.5 rounded-xl space-y-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black text-orange-600 uppercase tracking-wider">🎙️ Original Voice Description:</span>
+                          </div>
+                          {report.voiceOriginalTranscription && (
+                            <p className="text-[10px] font-black text-slate-800 italic bg-white px-2 py-1 rounded border border-slate-100">
+                              "{report.voiceOriginalTranscription}"
+                            </p>
+                          )}
+                          <audio src={report.voiceDescriptionUrl} controls className="w-full h-7 mt-1 rounded" />
+                        </div>
+                      )}
+
                       <p className="text-[10px] text-slate-400 font-bold">
                         By Resident: {report.reporterName}
                       </p>

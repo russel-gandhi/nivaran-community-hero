@@ -194,6 +194,21 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                     <p className="text-xs text-slate-600 line-clamp-2 italic leading-relaxed">
                       "{report.description || 'No description provided.'}"
                     </p>
+                    
+                    {report.voiceDescriptionUrl && (
+                      <div className="bg-slate-50 border border-slate-200/60 p-2.5 rounded-xl space-y-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-wider">🎙️ Original Voice Description:</span>
+                        </div>
+                        {report.voiceOriginalTranscription && (
+                          <p className="text-[10px] font-black text-slate-800 italic bg-white px-2 py-1 rounded border border-slate-100">
+                            "{report.voiceOriginalTranscription}"
+                          </p>
+                        )}
+                        <audio src={report.voiceDescriptionUrl} controls className="w-full h-7 mt-1 rounded" />
+                      </div>
+                    )}
+
                     <p className="text-[10px] text-slate-400">
                       Filed on {new Date(report.createdAt).toLocaleDateString()}
                     </p>
@@ -272,6 +287,20 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                     </div>
                     <h4 className="text-sm font-extrabold text-slate-800 mt-2">{report.subtag}</h4>
                     <p className="text-xs text-slate-500 italic mt-1 font-medium">"{report.description}"</p>
+                    
+                    {report.voiceDescriptionUrl && (
+                      <div className="bg-slate-50 border border-slate-200/60 p-2.5 rounded-xl space-y-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-wider">🎙️ Original Voice Description:</span>
+                        </div>
+                        {report.voiceOriginalTranscription && (
+                          <p className="text-[10px] font-black text-slate-800 italic bg-white px-2 py-1 rounded border border-slate-100">
+                            "{report.voiceOriginalTranscription}"
+                          </p>
+                        )}
+                        <audio src={report.voiceDescriptionUrl} controls className="w-full h-7 mt-1 rounded" />
+                      </div>
+                    )}
                   </div>
 
                   {report.evidenceUrl && (

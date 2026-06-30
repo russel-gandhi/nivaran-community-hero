@@ -79,6 +79,9 @@ export interface Report {
   resolution_proofs?: number;
   resolvedByUserId?: string;
   reopenedAt?: string;
+  voiceDescriptionUrl?: string; // base64 representation of original voice note
+  voiceOriginalTranscription?: string; // native language transcription
+  voiceEnglishTranslation?: string; // original translated English description
 }
 
 export interface RoutingLog {

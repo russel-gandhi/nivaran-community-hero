@@ -49,6 +49,20 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
   // Form State
   const [selectedTier, setSelectedTier] = useState<'flat' | 'common_area' | 'public' | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  
+  // Voice description states
+  const [descriptionMode, setDescriptionMode] = useState<'text' | 'voice'>('text');
+  const [voiceAudio, setVoiceAudio] = useState<string>(''); // Base64 audio representation
+  const [simulatedLanguage, setSimulatedLanguage] = useState<'hi' | 'mr' | 'hi_vague'>('hi');
+  const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
+  const [voiceOriginalTranscription, setVoiceOriginalTranscription] = useState('');
+  const [voiceEnglishTranslation, setVoiceEnglishTranslation] = useState('');
+  const [voiceFollowUpQuestion, setVoiceFollowUpQuestion] = useState<string | null>(null);
+  const [voiceFollowUpAnswer, setVoiceFollowUpAnswer] = useState('');
+  const [isVoiceFollowUpSubmitting, setIsVoiceFollowUpSubmitting] = useState(false);
+  const [voiceFollowUpAnswerSubmitted, setVoiceFollowUpAnswerSubmitted] = useState(false);
+  const [detectedCategoryName, setDetectedCategoryName] = useState<string | null>(null);
+  const [detectedSubtag, setDetectedSubtag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
   const [description, setDescription] = useState('');
@@ -124,6 +138,157 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
     setSelectedCategory(cat);
     setEvidenceType(cat.evidenceType);
     setStep(3);
+  };
+
+  // Handle recorded voice note capturing
+  const handleVoiceAudioCaptured = async (audioBase64: string) => {
+    setVoiceAudio(audioBase64);
+    setIsVoiceProcessing(true);
+    setVoiceFollowUpQuestion(null);
+    setVoiceFollowUpAnswerSubmitted(false);
+    setVoiceFollowUpAnswer('');
+    setErrorMsg(null);
+    setDetectedCategoryName(null);
+    setDetectedSubtag(null);
+
+    try {
+      const response = await fetch('/api/process-voice-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voiceAudio: audioBase64,
+          categories: categories.map(c => ({ id: c.id, name: c.name, subtag: c.subtag, tier: c.tier }))
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setVoiceOriginalTranscription(data.originalTranscription || 'Audio recorded.');
+      setVoiceEnglishTranslation(data.englishTranslation || '');
+      setDescription(data.englishTranslation || '');
+
+      if (data.detectedCategoryId) {
+        const cat = categories.find(c => c.id === data.detectedCategoryId);
+        if (cat) {
+          setSelectedCategory(cat);
+          setEvidenceType(cat.evidenceType);
+          setDetectedCategoryName(cat.name);
+          setDetectedSubtag(data.detectedSubtag || cat.subtag);
+        }
+      }
+
+      if (data.missingDetails && data.missingDetails !== 'none' && data.followUpQuestion) {
+        setVoiceFollowUpQuestion(data.followUpQuestion);
+      } else {
+        setVoiceFollowUpQuestion(null);
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to process voice note description: ' + (err.message || err));
+    } finally {
+      setIsVoiceProcessing(false);
+    }
+  };
+
+  // Play & Analyze Simulated voice
+  const handleTriggerSimulatedVoice = async () => {
+    const dummyAudio = 'data:audio/wav;base64,UklGRi4AAABXQVZFRm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    setVoiceAudio(dummyAudio);
+    setIsVoiceProcessing(true);
+    setVoiceFollowUpQuestion(null);
+    setVoiceFollowUpAnswerSubmitted(false);
+    setVoiceFollowUpAnswer('');
+    setErrorMsg(null);
+    setDetectedCategoryName(null);
+    setDetectedSubtag(null);
+
+    try {
+      const response = await fetch('/api/process-voice-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voiceAudio: dummyAudio,
+          categories: categories.map(c => ({ id: c.id, name: c.name, subtag: c.subtag, tier: c.tier })),
+          simulatedLanguage
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setVoiceOriginalTranscription(data.originalTranscription);
+      setVoiceEnglishTranslation(data.englishTranslation);
+      setDescription(data.englishTranslation);
+
+      if (data.detectedCategoryId) {
+        const cat = categories.find(c => c.id === data.detectedCategoryId);
+        if (cat) {
+          setSelectedCategory(cat);
+          setEvidenceType(cat.evidenceType);
+          setDetectedCategoryName(cat.name);
+          setDetectedSubtag(data.detectedSubtag || cat.subtag);
+        }
+      }
+
+      if (data.missingDetails && data.missingDetails !== 'none' && data.followUpQuestion) {
+        setVoiceFollowUpQuestion(data.followUpQuestion);
+      } else {
+        setVoiceFollowUpQuestion(null);
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to process voice simulation.');
+    } finally {
+      setIsVoiceProcessing(false);
+    }
+  };
+
+  // Submit response to Gemini's follow-up question
+  const handleVoiceFollowUpSubmit = async () => {
+    if (!voiceFollowUpAnswer.trim()) return;
+    setIsVoiceFollowUpSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const response = await fetch('/api/process-voice-followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalTranslation: voiceEnglishTranslation,
+          followUpQuestion: voiceFollowUpQuestion,
+          userResponse: voiceFollowUpAnswer,
+          categories: categories.map(c => ({ id: c.id, name: c.name, subtag: c.subtag, tier: c.tier }))
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setVoiceEnglishTranslation(data.refinedEnglishTranslation);
+      setDescription(data.refinedEnglishTranslation);
+      setVoiceFollowUpAnswerSubmitted(true);
+
+      if (data.detectedCategoryId) {
+        const cat = categories.find(c => c.id === data.detectedCategoryId);
+        if (cat) {
+          setSelectedCategory(cat);
+          setEvidenceType(cat.evidenceType);
+          setDetectedCategoryName(cat.name);
+          setDetectedSubtag(data.detectedSubtag || cat.subtag);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to process follow-up answer: ' + (err.message || err));
+    } finally {
+      setIsVoiceFollowUpSubmitting(false);
+    }
   };
 
   // Step 3 (Scope check API) -> Step 4
@@ -429,7 +594,10 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         lat: evidenceMetadata?.lat ?? null,
         lng: evidenceMetadata?.lng ?? null,
         imageHash: imageHash ?? null,
-        possibleReusedImage: possibleReusedImage ?? false
+        possibleReusedImage: possibleReusedImage ?? false,
+        voiceDescriptionUrl: descriptionMode === 'voice' ? voiceAudio : undefined,
+        voiceOriginalTranscription: descriptionMode === 'voice' ? voiceOriginalTranscription : undefined,
+        voiceEnglishTranslation: descriptionMode === 'voice' ? voiceEnglishTranslation : undefined
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {
@@ -824,15 +992,150 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
             </div>
           )}
 
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-700 block">Provide a description:</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Explain the location, nature, or details of the problem (e.g., 'Large leak dripping from common water meter near Sunrise flat A-402, causing lobby puddle')"
-              className="w-full text-xs p-3 border border-slate-200 rounded-xl h-24 focus:ring-2 focus:ring-orange-500 font-medium bg-slate-50/50"
-              id="issue-description-input"
-            />
+          <div className="space-y-4">
+            <div className="flex border-b border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDescriptionMode('text')}
+                className={`flex-1 pb-2 text-xs font-black text-center border-b-2 transition-all ${
+                  descriptionMode === 'text' ? 'border-orange-500 text-orange-500' : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                ✍️ Type Description
+              </button>
+              <button
+                type="button"
+                onClick={() => setDescriptionMode('voice')}
+                className={`flex-1 pb-2 text-xs font-black text-center border-b-2 transition-all ${
+                  descriptionMode === 'voice' ? 'border-orange-500 text-orange-500' : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                🎙️ Record Voice Note
+              </button>
+            </div>
+
+            {descriptionMode === 'text' ? (
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-slate-700 block">Provide a description:</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Explain the location, nature, or details of the problem (e.g., 'Large leak dripping from common water meter near Sunrise flat A-402, causing lobby puddle')"
+                  className="w-full text-xs p-3 border border-slate-200 rounded-xl h-24 focus:ring-2 focus:ring-orange-500 font-medium bg-slate-50/50"
+                  id="issue-description-input"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Language & Audio Source</label>
+                  <select
+                    value={simulatedLanguage}
+                    onChange={(e) => setSimulatedLanguage(e.target.value as any)}
+                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="hi">🇮🇳 Simulated Hindi Voice (Main Road Pothole)</option>
+                    <option value="mr">🇮🇳 Simulated Marathi Voice (Common Water Leak)</option>
+                    <option value="hi_vague">⚠️ Simulated Vague Hindi (Triggers Follow-Up Question)</option>
+                    <option value="real">🎙️ Real Microphone Recording</option>
+                  </select>
+                </div>
+
+                {simulatedLanguage === 'real' ? (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col items-center justify-center space-y-2">
+                    <span className="text-[11px] font-bold text-slate-500 text-center">Record your description in your native language (Hindi, Marathi, etc.)</span>
+                    <AudioRecorder onAudioCaptured={handleVoiceAudioCaptured} />
+                  </div>
+                ) : (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col space-y-3">
+                    <div className="text-[11px] text-slate-500 font-semibold bg-orange-50/50 p-3 rounded-lg border border-orange-100/50">
+                      {simulatedLanguage === 'hi' && "🔊 Simulates reporting a heavy pothole in Hindi: \"सेक्टर 62 की मुख्य सड़क पर बहुत बड़ा गड्ढा हो गया है...\""}
+                      {simulatedLanguage === 'mr' && "🔊 Simulates reporting a severe pipeline leakage in Marathi: \"आमच्या इमारतीमध्ये पाण्याच्या पाईप फुटली आहे...\""}
+                      {simulatedLanguage === 'hi_vague' && "🔊 Simulates reporting a vague description in Hindi: \"भैया कुछ खराब हो गया है, जल्दी आओ...\" to trigger Gemini follow-up verification."}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTriggerSimulatedVoice}
+                      disabled={isVoiceProcessing}
+                      className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      {isVoiceProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : '🔊 Play & Submit Voice Description'}
+                    </button>
+                  </div>
+                )}
+
+                {isVoiceProcessing && (
+                  <div className="p-5 bg-orange-50/50 border border-orange-100 rounded-xl flex flex-col items-center justify-center text-center space-y-2">
+                    <RefreshCw className="w-6 h-6 text-orange-500 animate-spin" />
+                    <span className="text-xs font-bold text-slate-700 animate-pulse">Gemini is transcribing and translating your voice note...</span>
+                  </div>
+                )}
+
+                {voiceOriginalTranscription && !isVoiceProcessing && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-3 shadow-xs">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-orange-500 uppercase tracking-wider block">🗣️ Original Voice Transcription:</span>
+                      <p className="text-xs font-black text-slate-800 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100 italic">
+                        "{voiceOriginalTranscription}"
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-teal-600 uppercase tracking-wider block">🇬🇧 English Translation (Stored):</span>
+                      <p className="text-xs font-semibold text-slate-700 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100">
+                        {voiceEnglishTranslation}
+                      </p>
+                    </div>
+
+                    {detectedCategoryName && (
+                      <div className="bg-emerald-50/60 border border-emerald-100 p-2.5 rounded-lg text-[11px] text-emerald-800 flex items-center gap-2">
+                        <span className="font-extrabold text-emerald-600">✓ Auto-Aligned Category:</span>
+                        <span className="font-bold bg-emerald-100 px-2 py-0.5 rounded-md">{detectedCategoryName}</span>
+                      </div>
+                    )}
+
+                    {voiceFollowUpQuestion && !voiceFollowUpAnswerSubmitted && (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                          <div>
+                            <span className="text-[9px] font-bold text-amber-800 block uppercase tracking-wider">Gemini Follow-Up Question (Same Language):</span>
+                            <p className="text-xs font-extrabold text-amber-900 mt-1">
+                              {voiceFollowUpQuestion}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            placeholder="Type or speak your reply..."
+                            value={voiceFollowUpAnswer}
+                            onChange={(e) => setVoiceFollowUpAnswer(e.target.value)}
+                            className="w-full text-xs p-2.5 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 font-bold bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVoiceFollowUpSubmit}
+                            disabled={isVoiceFollowUpSubmitting || !voiceFollowUpAnswer.trim()}
+                            className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            {isVoiceFollowUpSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Submit Answer'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {voiceFollowUpAnswerSubmitted && (
+                      <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-[11px] text-emerald-800 space-y-1 animate-in slide-in-from-bottom duration-200">
+                        <span className="font-extrabold flex items-center gap-1 text-emerald-600">✓ Details Captured Successfully!</span>
+                        <p className="font-medium text-slate-600">Refined Translation: <strong className="text-slate-800">{voiceEnglishTranslation}</strong></p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             
             <div className="bg-amber-50 border border-amber-200/60 p-3 rounded-xl text-[11px] text-amber-800 flex gap-2">
               <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
