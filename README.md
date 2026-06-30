@@ -1,99 +1,238 @@
-# Nivaran - Hyperlocal Civic & Building Issue Resolver
+# 🌟 Nivaran
 
-**Nivaran** is a comprehensive, AI-powered hyperlocal civic routing and resolution platform tailored for communities and residential buildings. Acting as an intelligent, real-time civic desk, Nivaran bridges the gap between citizens, building managers, and municipal bodies by streamlining the reporting, verification, and tracking of civic issues. 
+> **Hyperlocal Civic & Building Issue Resolver**
 
-By leveraging the advanced multimodal capabilities of the **Gemini 2.5 Flash** model, Nivaran removes language and accessibility barriers through seamless native-language voice reporting, automatic transcription, and English translation. Furthermore, the AI acts as an automated triage agent—instantly categorizing reports, assessing severity, and verifying photographic evidence for authenticity to filter out spam and prioritize critical hazards. 
-
-Beyond reporting, Nivaran fosters community engagement through a gamified reward system, proximity-based push notifications for active issues, and citizen-led "Community Fix" initiatives, ensuring that local problems are not just reported, but collaboratively resolved.
+Nivaran is a comprehensive, AI-powered hyperlocal civic routing and resolution platform tailored for communities and residential buildings. It acts as an intelligent, real-time civic desk that bridges the gap between citizens, building managers, and municipal bodies by streamlining the reporting, verification, and tracking of civic issues.
 
 ---
 
-## 🚀 Key Features
+## 📖 Project Overview
 
-### 👥 Role-Based System
-* **Citizen Mode**: Report issues, track status, organize community fixes, earn points (XP), and claim rewards.
-* **Manager Mode**: Review, moderate, route, and resolve reported issues with detailed logs.
+### The Problem
+Citizens often struggle to report local issues (like broken streetlights or potholes) due to fragmented municipal systems, language barriers, and a lack of transparency. Building managers are overwhelmed with unverified complaints via chat groups, lacking a structured way to triage and prioritize hazards.
 
-### 🔐 Multi-Mode Authentication
-* **Google Account**: Fast sign-in utilizing Google Identity Platform.
-* **Email & Password**: Standard credential authentication.
-* **Demo Accounts**: Instant single-click authentication for fast testing of various roles (Citizen, Manager, Admin).
+### Why Current Solutions are Insufficient
+Existing 311 systems or complaint portals are often static forms that don't accommodate non-English speakers, fail to filter out spam or duplicates, and provide zero feedback to the citizen once a report is submitted, leading to apathy.
 
-### 🎙️ Multilingual Voice Note Reporting & Auto-Translation
-* **Native Language Input**: Citizens can record voice notes directly in their preferred language (e.g., Hindi, Marathi, Bengali) instead of typing description texts.
-* **Multimodal Gemini Pipeline**: The raw audio is processed directly by the native `gemini-2.5-flash` model to:
-  1. Transcribe the audio precisely in its original language.
-  2. Translate the description into high-quality English for storage.
-  3. Classify and auto-align it to the correct predefined category, sub-tag, and tier.
-* **Interactive Verification Dialogues**: If critical details are missing (e.g., category or location), Gemini automatically generates a polite follow-up question in the *same* language (Hindi/Marathi) before finalizing the report. The user's reply is translated and seamlessly combined with the original description.
-* **Persistent Audio Playback**: The original audio file is preserved and remains attached to the issue report for reference by citizens and maintenance teams.
+### How Nivaran Solves It
+By leveraging the advanced multimodal capabilities of the **Gemini 2.5 Flash** model, Nivaran removes language and accessibility barriers through seamless native-language voice reporting and automated translation. The AI acts as an autonomous triage agent—instantly categorizing reports, assessing severity, and performing a multi-step reasoning loop to verify photographic evidence, check for duplicates, and route the issue to the correct authority. Furthermore, it gamifies civic engagement to reward citizens for improving their community.
 
-### 🤖 AI-Powered Issue Verification
+---
+
+## ✨ Key Features
+
+### 🤖 AI Verification
+* **Multi-Step Reasoning Loop**: Gemini operates as an agent, formulating a plan, calling tools (duplicate checks, metadata validation), and revising its verdict before generating a confidence score.
+* **Computer Vision Validation**: Gemini automatically verifies uploaded media to flag potential false reports, duplicate submissions, or unrelated images.
+* **AI Dispatch Notes**: Transparent reasoning traces are surfaced in the UI so both citizens and managers understand *why* the AI made its routing decision.
+
+### 🎙️ Issue Reporting
+* **Native Language Voice Input**: Citizens can record voice notes directly in their preferred language (e.g., Hindi, Marathi, Bengali).
+* **Multimodal Translation Pipeline**: The raw audio is processed by `gemini-2.5-flash` to transcribe, translate to English, and auto-categorize the issue.
 * **Evidence Upload**: Submit photos, videos, or audio to back up your report.
-* **Computer Vision Validation**: Gemini AI automatically verifies the validity of the uploaded media to flag potential false reports, duplicate submissions, or unrelated images.
-* **Routing & Confidence Scoring**: Generates live confidence ratings and automatically routes tickets to appropriate channels.
 
-### 🎁 Citizen Rewards & Coupons
-* **Gamified Milestones**: Earn points (XP) for reporting valid issues, confirming others' reports, or resolving community problems.
-* **Unlockable Rewards**: Cross point thresholds on the leaderboard to unlock local mock coupons:
-  * 🟢 **100 XP**: 10% OFF Fresh Organic Produce at GreenGrocer stores.
-  * 🟡 **250 XP**: Free Ginger Cutting Chai at ChaiPoint Corner.
-  * 🔵 **500 XP**: ₹200 OFF Home Cleaning and sanitization services from UrbanCare.
-* **Secure UI-Only Redemption**: Smooth animations with secure reveal mechanisms and single-click coupon code copying.
+### 🔀 Three-Tier Routing
+* **Flat/Personal**: Issues within a resident's private space (routed to maintenance).
+* **Common Area**: Issues in shared building spaces (routed to building manager).
+* **Public/Street**: Civic issues outside the building (routed to municipal dashboards/public map).
 
-### 🗺️ Interactive Public Map & Proximity Alerts
+### 🛠️ Community Verification & Resolution Workflow
+* **Community Fix Initiative**: Citizens can organize to resolve safe public issues collaboratively.
+* **"After" Evidence Verification**: Upload an "After" photo/video. Gemini compares it against the original report to verify the fix.
+* **Celebratory Broadcasts**: Real-time broadcast toasts are pushed to online citizens when a local issue is resolved.
+
+### 📊 Manager Dashboard
+* **Automated Triage**: Managers see a prioritized queue of issues sorted by AI-assigned severity.
+* **Time-Decay Agents**: AI automatically checks open issues over time to re-notify or escalate based on citizen recurrence reports.
+
+### 🏆 Gamification
+* **XP & Milestones**: Earn points for reporting valid issues, confirming others' reports, or resolving community problems.
+* **Coupon Rewards**: Cross point thresholds to unlock mock local rewards (e.g., free chai, grocery discounts).
+
+### 🗺️ Maps & Notifications
 * **Live Spatial Tracker**: Browse anonymous public street complaints on a real-time interactive map.
-* **Proximity Push Notifications**: Utilizing Firebase Cloud Messaging (FCM) and Service Workers, citizens receive push notifications asking *"Is this still a problem?"* with customized physical vibration patterns when they walk near an active public issue.
-
-### 🛠️ Community Fix Initiative
-* **Organize & Collaborate**: Citizens can join "Community Fix Initiatives" for safe categories (e.g., Garbage, Cleanliness, Animal issues).
-* **"After" Video Verification**: Upload an "After" video. Gemini AI compares it against the original report to verify that the issue has been completely resolved.
-* **Celebratory Broadcasts**: Once resolved, celebratory real-time broadcast toasts are pushed to all online citizens in the application.
+* **Proximity Alerts**: Push notifications ask *"Is this still a problem?"* when citizens walk near active public issues (simulated).
 
 ---
 
-## 💻 Tech Stack
+## 🛠️ Google Technologies Used
 
-* **Frontend**: React 19, Vite, Tailwind CSS, Lucide React (Icons), Framer Motion (Animations).
-* **Backend**: Express.js, Node.js (via `tsx` in development).
-* **Database & Auth**: Firebase Firestore (Real-time NoSQL), Firebase Auth.
-* **AI Engine**: Google GenAI SDK (`@google/genai` utilizing the powerful `gemini-2.5-flash` model).
+| Technology | Purpose |
+|------------|---------|
+| **Gemini 2.5 Flash** | Powers the core AI Verification Agent, multimodal translation, issue categorization, and the time-decay follow-up agent via `@google/genai`. |
+| **Google Cloud Firestore** | Provides real-time NoSQL database synchronization across all active citizen and manager dashboards. |
+| **Firebase Authentication** | Manages secure sign-ins, handling Google Identity platform and standard credential accounts. |
+| **Google Workspace (NodeMailer)** | Handles SMTP email dispatch for time-decay escalations and notifications. |
 
 ---
 
-## ⚙️ Getting Started
+## 📐 System Architecture
+
+```mermaid
+flowchart TD
+    Citizen([Citizen]) -->|Voice/Photo Report| Frontend[React/Vite Frontend]
+    Frontend -->|Auth| FirebaseAuth[Firebase Auth]
+    Frontend -->|Write| Firestore[(Firestore DB)]
+    Frontend -->|Send Evidence| Agent[Gemini Verification Agent]
+    
+    subgraph AI Workflow [Multimodal AI Agent Loop]
+        Agent -->|Plan| Tools{Tool Calls}
+        Tools -->|Check Meta| Metadata[Metadata Validation]
+        Tools -->|Query DB| Dupes[Duplicate Detection]
+        Tools -->|Check Tax| Tax[Taxonomy Check]
+        Metadata --> Agent
+        Dupes --> Agent
+        Tax --> Agent
+    end
+    
+    Agent -->|Final Verdict| Routing[Three-Tier Routing]
+    Routing -->|Public| Maps[Public Map]
+    Routing -->|Common/Flat| Manager[Manager Dashboard]
+    
+    Manager -->|Resolve| Verification[Resolution Verification]
+    Verification -->|Updates| Firestore
+    Firestore -->|Triggers| Notifs[Gamification & Notifications]
+```
+
+---
+
+## 🧠 AI Workflow
+
+The report verification pipeline is a true multi-step agentic loop, rather than a single structured call. 
+
+```mermaid
+sequenceDiagram
+    participant Citizen
+    participant Agent as Gemini Agent
+    participant Tools as Agent Tools
+    participant DB as Firestore
+
+    Citizen->>Agent: Submit Issue (Photo + Description)
+    Note over Agent: 1. Formulates Plan
+    Agent->>Tools: call: check_metadata(photo)
+    Tools-->>Agent: EXIF Data (GPS, Time)
+    Agent->>Tools: call: check_duplicate(location, category)
+    Tools->>DB: Query open issues nearby
+    DB-->>Tools: Returns candidates
+    Tools-->>Agent: Duplicate Results
+    Note over Agent: 2. Reviews Tool Outputs
+    Note over Agent: 3. Self-Correction Phase
+    Agent->>Agent: Finalizes Confidence Score & Severity
+    Agent-->>Citizen: AI Dispatch Note & Routing Verdict
+```
+
+---
+
+## 🚀 Judge's Guide (3–5 Minute Demo)
+
+Follow this quick walkthrough to experience the complete capabilities of Nivaran:
+
+1. **Sign In:**
+   - Open the deployed application.
+   - Click **Demo Accounts (Test Mode)** and select **Russel Gandhi (Citizen)**.
+2. **Citizen Dashboard & Reporting:**
+   - Click **Report New Issue**.
+   - **Tier Selection:** Choose *Common Area* or *Public*.
+   - **Upload Evidence:** Select a photo of a common civic issue (e.g., a pothole or broken pipe).
+   - **Description:** Type a short description or use the *Voice* tab to speak in Hindi/Marathi.
+3. **Observe AI Agentic Loop:**
+   - Submit the report. You will see the AI actively reasoning, generating a plan, executing tool calls (checking duplicates/metadata), and arriving at a verdict.
+   - Read the **AI Dispatch Note** attached to your generated ticket.
+4. **Gamification & Map:**
+   - Check the **Leaderboard/Rewards** tab to see your XP increase.
+   - Navigate to the **Map View** to see your issue plotted (if Public).
+5. **Manager Resolution:**
+   - Click the profile icon (top right) and sign out.
+   - Click Demo Accounts and sign in as **Vikram Sharma (Manager)**.
+   - Open the Manager Dashboard, find the issue you just created, and click **Resolve**.
+   - Upload an "After" photo to trigger the Gemini resolution verifier, closing the loop.
+
+---
+
+## 🔐 Demo Credentials
+
+Nivaran features built-in instant demo authentication to speed up testing. 
+
+On the login screen, look for the **Demo Accounts (Test Mode)** section:
+- **Citizen Demo:** `Russel Gandhi` (Click to instantly sign in)
+- **Manager Demo:** `Vikram Sharma` (Click to instantly sign in)
+
+If you prefer to test standard authentication, you can also use "Sign in with Google."
+
+---
+
+## 💻 Installation
 
 ### Prerequisites
-* Node.js (v18+)
-* Firebase Project Setup (Firestore, Auth, rules)
-* Gemini API Key
+- Node.js (v18+)
+- Firebase Project Setup (Firestore, Auth)
+- Gemini API Key
 
-### Installation
+### Setup Instructions
 
-1. **Install dependencies**:
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-username/nivaran.git
+   cd nivaran
+   ```
+
+2. **Install dependencies:**
    ```bash
    npm install
    ```
-2. **Environment Variables**:
-   Add your server-side Gemini API key in your environment settings (or a local `.env` file):
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-3. **Firebase Configuration**:
-   Ensure `firebase-applet-config.json` is properly populated with your Firebase project credentials.
 
-4. **Run the Development Server**:
+3. **Configure Environment Variables:**
+   Create a `.env` file in the root directory (see section below).
+
+4. **Start the Development Server:**
    ```bash
    npm run dev
    ```
-   The app will start at `http://localhost:3000`.
+   The application will start at `http://localhost:3000`.
 
-### Production Build
-To bundle both the compiled React frontend assets and the bundled CommonJS backend server:
-```bash
-npm run build
+---
+
+## 🔑 Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# Required: Google Gemini API Key for the multi-step verification agent
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
-To run the production application:
-```bash
-npm run start
+
+*Note: Firebase configuration is handled via the `firebase-applet-config.json` file in the root directory.*
+
+---
+
+## 📁 Project Structure
+
+```text
+nivaran/
+├── src/
+│   ├── components/       # React components (Wizards, Dashboards, Maps)
+│   ├── lib/              # Firebase initialization and helpers
+│   ├── App.tsx           # Main application router and auth state
+│   ├── main.tsx          # React entry point
+│   └── types.ts          # Global TypeScript interfaces
+├── server.ts             # Express backend, Gemini Agent loop, and Vite middleware
+├── package.json          # Dependencies and scripts (dev, build, start)
+└── firebase-applet-config.json # Firebase project configuration
 ```
+- **`server.ts`**: Contains the complex Gemini agentic loops, time-decay agents, and API routes, running in a full-stack Express environment alongside Vite.
+- **`src/components/ReportIssueWizard.tsx`**: The core multi-step reporting UI that handles multimodal uploads and displays the AI reasoning trace.
+
+---
+
+## 🗺️ Future Roadmap
+
+- [x] **Advanced Agentic Loop**: Multistep reasoning for evidence validation.
+- [ ] **WhatsApp Bot Integration**: Allow citizens to send a photo and voice note directly to a WhatsApp number to trigger the Gemini reporting pipeline.
+- [ ] **Hardware IoT Integration**: Smart trash cans and environmental sensors that automatically generate Level 1 alerts on the Manager Dashboard.
+- [ ] **Municipal Escalation API**: Direct API integration with local government 311 systems for unhandled public issues.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
