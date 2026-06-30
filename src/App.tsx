@@ -449,6 +449,21 @@ export default function App() {
     }
   };
 
+  // Sync real-time simulated or real location of user in Firestore
+  const handleUpdateLocation = async (lat: number, lng: number) => {
+    if (!currentUserProfile || isOfflineMode) return;
+    try {
+      const userRef = doc(db, 'users', currentUserProfile.id);
+      await updateDoc(userRef, {
+        lat,
+        lng,
+        lastActive: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('Failed to update live user location in Firestore:', err);
+    }
+  };
+
   // Community confirmation vote (still broken or fixed)
   const handleVote = async (reportId: string, type: 'still_broken' | 'fixed') => {
     try {
@@ -1337,6 +1352,8 @@ export default function App() {
                 onFixVerified={handleFixVerified}
                 currentUserProfile={null} 
                 accessToken={accessTokenState}
+                allProfiles={allProfiles}
+                onUpdateLocation={handleUpdateLocation}
               />
             </div>
           ) : (
@@ -1362,6 +1379,8 @@ export default function App() {
                     onFixVerified={handleFixVerified}
                     currentUserProfile={currentUserProfile} 
                     accessToken={accessTokenState}
+                    allProfiles={allProfiles}
+                    onUpdateLocation={handleUpdateLocation}
                   />
                 </div>
               )}

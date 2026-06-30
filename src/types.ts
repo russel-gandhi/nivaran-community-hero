@@ -11,6 +11,9 @@ export interface UserProfile {
   flaggedForReview?: boolean;
   role?: 'citizen' | 'manager';
   isCoManager?: boolean;
+  lat?: number;
+  lng?: number;
+  lastActive?: string;
 }
 
 export interface Building {

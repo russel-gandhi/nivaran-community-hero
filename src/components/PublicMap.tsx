@@ -11,15 +11,35 @@ interface PublicMapProps {
   onFixVerified?: (reportId: string) => void;
   currentUserProfile: UserProfile | null;
   accessToken?: string | null;
+  allProfiles?: UserProfile[];
+  onUpdateLocation?: (lat: number, lng: number) => void;
 }
 
-export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerified, currentUserProfile, accessToken }: PublicMapProps) {
+export default function PublicMap({ 
+  reports, 
+  onVote, 
+  onOrganizeFix, 
+  onFixVerified, 
+  currentUserProfile, 
+  accessToken,
+  allProfiles,
+  onUpdateLocation
+}: PublicMapProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'photo' | 'video' | 'audio'; title: string; description: string } | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [dismissedPrompts, setDismissedPrompts] = useState<Set<string>>(new Set());
+  const [driftOffset, setDriftOffset] = useState<number>(0);
+
+  // Interval to update simulated movement drift of other users
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDriftOffset((prev) => prev + 0.005);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fix verification states
   const [isUploadingFix, setIsUploadingFix] = useState(false);
@@ -161,17 +181,30 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
 
   useEffect(() => {
     if (!currentUserProfile) return;
-    if (!('geolocation' in navigator)) return;
 
-    // Simulate an initial location near the center of our map if real GPS takes time or is mocked
-    setUserLocation({ lat: 28.64, lng: 77.34 });
+    // Use previously saved location if available
+    if (currentUserProfile.lat && currentUserProfile.lng) {
+      setUserLocation({ lat: currentUserProfile.lat, lng: currentUserProfile.lng });
+    } else {
+      // Default to center of their selected property
+      const defaultLat = currentUserProfile.registeredBuildingId === 'greenview-soc' ? 17.4483 : 28.6400;
+      const defaultLng = currentUserProfile.registeredBuildingId === 'greenview-soc' ? 78.3741 : 77.3400;
+      setUserLocation({ lat: defaultLat, lng: defaultLng });
+      if (onUpdateLocation) {
+        onUpdateLocation(defaultLat, defaultLng);
+      }
+    }
+
+    if (!('geolocation' in navigator)) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
+        const newLat = position.coords.latitude;
+        const newLng = position.coords.longitude;
+        setUserLocation({ lat: newLat, lng: newLng });
+        if (onUpdateLocation) {
+          onUpdateLocation(newLat, newLng);
+        }
       },
       (error) => {
         console.warn('Error watching position:', error);
@@ -184,7 +217,7 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [currentUserProfile]);
+  }, [currentUserProfile?.id, currentUserProfile?.registeredBuildingId]);
 
   // Filter public reports that are active
   const publicReports = reports.filter(r => r.tier === 'public' && r.status !== 'resolved');
@@ -282,7 +315,49 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
       </div>
 
       {/* Map Stage */}
-      <div className="relative flex-1 bg-slate-200 overflow-hidden min-h-[350px]" id="map-viewport">
+      <div 
+        className="relative flex-1 bg-slate-200 overflow-hidden min-h-[350px] cursor-crosshair border border-slate-300 rounded-2xl shadow-inner" 
+        id="map-viewport"
+        onClick={(e) => {
+          // If the user clicked on a pin, a popup, or interactive element, ignore it.
+          if (
+            (e.target as HTMLElement).closest('button') || 
+            (e.target as HTMLElement).closest('.z-30') || 
+            (e.target as HTMLElement).closest('.z-10') || 
+            (e.target as HTMLElement).closest('#legend')
+          ) {
+            return;
+          }
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          
+          const percentX = (clickX / rect.width) * 100;
+          const percentY = (clickY / rect.height) * 100;
+          
+          // Map percentage back to lat/lng based on Noida/Hyderabad
+          const isHyderabad = currentUserProfile?.registeredBuildingId === 'greenview-soc';
+          const baseLat = isHyderabad ? 17.4 : 28.6;
+          const baseLng = isHyderabad ? 78.3 : 77.3;
+          
+          // Simple inverse mapping
+          const newLat = baseLat + ((percentY - 10) / 1000);
+          const newLng = baseLng + ((percentX - 10) / 1000);
+          
+          setUserLocation({ lat: newLat, lng: newLng });
+          if (onUpdateLocation) {
+            onUpdateLocation(newLat, newLng);
+          }
+        }}
+      >
+        {/* Real-time walk helper banner */}
+        {currentUserProfile && (
+          <div className="absolute top-3 left-4 right-4 bg-slate-900/85 backdrop-blur-xs text-white px-3 py-1.5 rounded-xl text-[9px] font-bold text-center pointer-events-none z-15 shadow-md flex items-center justify-center gap-1.5 animate-bounce">
+            <Users className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
+            <span>Map Sandbox Active: Click anywhere to walk and test proximity alerts!</span>
+          </div>
+        )}
+
         {/* Mocking a beautiful administrative grid map of Noida/Hyderabad */}
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
         
@@ -296,7 +371,7 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
         </svg>
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-xs p-3 rounded-xl border border-slate-100 shadow-lg text-[10px] space-y-1.5 z-10">
+        <div id="legend" className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-xs p-3 rounded-xl border border-slate-100 shadow-lg text-[10px] space-y-1.5 z-10">
           <p className="font-semibold text-slate-700">Severity Indicators</p>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
@@ -316,70 +391,115 @@ export default function PublicMap({ reports, onVote, onOrganizeFix, onFixVerifie
           </div>
         </div>
 
-        {/* Dynamic Pins */}
-        {filteredReports.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-            <MapPin className="w-10 h-10 text-slate-400 mb-2 animate-bounce" />
-            <p className="text-sm font-medium text-slate-600">No active public issues found</p>
-            <p className="text-xs text-slate-400 mt-1">Try changing the filters above</p>
-          </div>
-        ) : (
-          filteredReports.map((report, index) => {
-            // Generate deterministic but spread out positions for demo purposes if lat/lng are small
-            let topPercent = 25 + (index * 13) % 60;
-            let leftPercent = 15 + (index * 21) % 75;
+        {/* Helper function definition */}
+        {(() => {
+          // Define coordinate percent calculator
+          const getCoordinatePercent = (lat: number, lng: number) => {
+            const isHyderabad = Math.abs(lat - 17.4) < 2.0;
+            const baseLat = isHyderabad ? 17.4 : 28.6;
+            const baseLng = isHyderabad ? 78.3 : 77.3;
+            
+            const top = Math.min(92, Math.max(8, ((((lat - baseLat) * 1000) % 80) + 80) % 80 + 10));
+            const left = Math.min(92, Math.max(8, ((((lng - baseLng) * 1000) % 80) + 80) % 80 + 10));
+            return { top, left };
+          };
 
-            // If coordinates are simulated in Indian ranges, we map them
-            if (report.lat && report.lng) {
-              topPercent = Math.min(90, Math.max(10, ((report.lat - 28.6) * 1000) % 80 + 10));
-              leftPercent = Math.min(90, Math.max(10, ((report.lng - 77.3) * 1000) % 80 + 10));
-            }
-
-            const isSelected = selectedReport?.id === report.id;
-
-            return (
-              <button
-                key={report.id}
-                onClick={() => setSelectedReport(report)}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 p-2 rounded-full cursor-pointer transition-all duration-300 z-10 flex items-center justify-center ${
-                  isSelected ? 'scale-125 ring-4 ring-orange-500/30' : 'hover:scale-110'
-                }`}
-                style={{ top: `${topPercent}%`, left: `${leftPercent}%` }}
-                id={`pin-${report.id}`}
-              >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 ${getSeverityColor(report.severity)}`}>
-                  <MapPin className="w-4 h-4" />
+          return (
+            <>
+              {/* Dynamic Pins */}
+              {filteredReports.length === 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+                  <MapPin className="w-10 h-10 text-slate-400 mb-2 animate-bounce" />
+                  <p className="text-sm font-medium text-slate-600">No active public issues found</p>
+                  <p className="text-xs text-slate-400 mt-1">Try changing the filters above</p>
                 </div>
-              </button>
-            );
-          })
-        )}
+              ) : (
+                filteredReports.map((report, index) => {
+                  let topPercent = 25 + (index * 13) % 60;
+                  let leftPercent = 15 + (index * 21) % 75;
 
-        {/* User Location Avatar Pin */}
-        {currentUserProfile && userLocation && (
-          (() => {
-            // Calculate position mapping
-            const topPercent = Math.min(95, Math.max(5, ((userLocation.lat - 28.6) * 1000) % 80 + 10));
-            const leftPercent = Math.min(95, Math.max(5, ((userLocation.lng - 77.3) * 1000) % 80 + 10));
+                  if (report.lat && report.lng) {
+                    const coords = getCoordinatePercent(report.lat, report.lng);
+                    topPercent = coords.top;
+                    leftPercent = coords.left;
+                  }
 
-            return (
-              <div 
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center justify-center transition-all duration-1000 ease-linear pointer-events-none"
-                style={{ top: `${topPercent}%`, left: `${leftPercent}%` }}
-              >
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-blue-500/30 animate-ping"></div>
-                  <div className="relative w-12 h-12 bg-white rounded-full shadow-xl border-2 border-white overflow-hidden flex items-center justify-center">
-                    <AvatarIllustration seed={currentUserProfile.name || currentUserProfile.id} className="w-full h-full" />
+                  const isSelected = selectedReport?.id === report.id;
+
+                  return (
+                    <button
+                      key={report.id}
+                      onClick={() => setSelectedReport(report)}
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 p-2 rounded-full cursor-pointer transition-all duration-300 z-10 flex items-center justify-center ${
+                        isSelected ? 'scale-125 ring-4 ring-orange-500/30' : 'hover:scale-110'
+                      }`}
+                      style={{ top: `${topPercent}%`, left: `${leftPercent}%` }}
+                      id={`pin-${report.id}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md border-2 ${getSeverityColor(report.severity)}`}>
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+
+              {/* All Active Users Avatar Pins */}
+              {allProfiles && allProfiles.map((profile) => {
+                let uLat = profile.lat;
+                let uLng = profile.lng;
+                
+                const isMe = profile.id === currentUserProfile?.id;
+                
+                if (!uLat || !uLng) {
+                  // Seed coordinates dynamically if they are default/demo profiles so they walk around
+                  const idx = (allProfiles.indexOf(profile) + 1);
+                  const angle = driftOffset + idx * (Math.PI / 2);
+                  const radius = 0.015 + (idx * 0.005) % 0.02;
+                  
+                  const isHyderabad = currentUserProfile?.registeredBuildingId === 'greenview-soc';
+                  const centerLat = isHyderabad ? 17.4483 : 28.6400;
+                  const centerLng = isHyderabad ? 78.3741 : 77.3400;
+                  
+                  uLat = centerLat + Math.sin(angle) * radius;
+                  uLng = centerLng + Math.cos(angle) * radius;
+                }
+                
+                const coords = getCoordinatePercent(uLat, uLng);
+                
+                return (
+                  <div 
+                    key={profile.id}
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center justify-center transition-all duration-1000 ease-linear pointer-events-none"
+                    style={{ top: `${coords.top}%`, left: `${coords.left}%` }}
+                    id={`avatar-pin-${profile.id}`}
+                  >
+                    <div className="relative">
+                      {isMe && <div className="absolute inset-0 rounded-full bg-orange-500/30 animate-ping"></div>}
+                      {!isMe && <div className="absolute inset-0 rounded-full bg-teal-500/20 animate-pulse"></div>}
+                      
+                      <div className={`relative w-11 h-11 bg-white rounded-full shadow-lg border-2 overflow-hidden flex items-center justify-center ${
+                        isMe ? 'border-orange-500 ring-2 ring-orange-500/20 w-12 h-12' : 'border-teal-400'
+                      }`}>
+                        <AvatarIllustration seed={profile.name || profile.id} className="w-full h-full" />
+                      </div>
+                      
+                      {/* Active Indicator Dot */}
+                      <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                        isMe ? 'bg-orange-500 animate-pulse' : 'bg-teal-500'
+                      }`}></div>
+                    </div>
+                    <div className={`mt-1 px-2 py-0.5 rounded-full shadow-sm text-[8px] font-bold ${
+                      isMe ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-100'
+                    }`}>
+                      {isMe ? 'You' : profile.name.split(' ')[0]}
+                    </div>
                   </div>
-                </div>
-                <div className="mt-1 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm text-[9px] font-bold text-slate-700">
-                  {currentUserProfile.name.split(' ')[0]}
-                </div>
-              </div>
-            );
-          })()
-        )}
+                );
+              })}
+            </>
+          );
+        })()}
 
         {/* Quick Verification Popup Overlay */}
         {promptReport && !selectedReport && (
