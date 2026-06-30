@@ -1,6 +1,10 @@
 # Nivaran - Hyperlocal Civic & Building Issue Resolver
 
-Nivaran is an agentic, real-time hyperlocal civic routing desk designed for Indian residents. It automatically routes, verifies, and resolves civic and building issues using Gemini AI, gamification, and community-driven initiatives.
+**Nivaran** is a comprehensive, AI-powered hyperlocal civic routing and resolution platform tailored for communities and residential buildings. Acting as an intelligent, real-time civic desk, Nivaran bridges the gap between citizens, building managers, and municipal bodies by streamlining the reporting, verification, and tracking of civic issues. 
+
+By leveraging the advanced multimodal capabilities of the **Gemini 2.5 Flash** model, Nivaran removes language and accessibility barriers through seamless native-language voice reporting, automatic transcription, and English translation. Furthermore, the AI acts as an automated triage agent—instantly categorizing reports, assessing severity, and verifying photographic evidence for authenticity to filter out spam and prioritize critical hazards. 
+
+Beyond reporting, Nivaran fosters community engagement through a gamified reward system, proximity-based push notifications for active issues, and citizen-led "Community Fix" initiatives, ensuring that local problems are not just reported, but collaboratively resolved.
 
 ---
 
@@ -17,7 +21,7 @@ Nivaran is an agentic, real-time hyperlocal civic routing desk designed for Indi
 
 ### 🎙️ Multilingual Voice Note Reporting & Auto-Translation
 * **Native Language Input**: Citizens can record voice notes directly in their preferred language (e.g., Hindi, Marathi, Bengali) instead of typing description texts.
-* **Multimodal Gemini Pipeline**: The raw audio is processed directly by the native `gemini-3.5-flash` model to:
+* **Multimodal Gemini Pipeline**: The raw audio is processed directly by the native `gemini-2.5-flash` model to:
   1. Transcribe the audio precisely in its original language.
   2. Translate the description into high-quality English for storage.
   3. Classify and auto-align it to the correct predefined category, sub-tag, and tier.
@@ -53,7 +57,7 @@ Nivaran is an agentic, real-time hyperlocal civic routing desk designed for Indi
 * **Frontend**: React 19, Vite, Tailwind CSS, Lucide React (Icons), Framer Motion (Animations).
 * **Backend**: Express.js, Node.js (via `tsx` in development).
 * **Database & Auth**: Firebase Firestore (Real-time NoSQL), Firebase Auth.
-* **AI Engine**: Google GenAI SDK (`@google/genai` utilizing the powerful `gemini-3.5-flash` model).
+* **AI Engine**: Google GenAI SDK (`@google/genai` utilizing the powerful `gemini-2.5-flash` model).
 
 ---
 
