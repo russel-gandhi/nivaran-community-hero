@@ -168,6 +168,44 @@ export default function App() {
             };
             await setDoc(userRef, defaultProfile);
             setCurrentUserProfile(defaultProfile);
+          } else if (sessionUserId === 'u-demo-priya') {
+            const defaultProfile: UserProfile = {
+              id: 'u-demo-priya',
+              name: 'Priya Sharma',
+              email: 'priya.sharma@gmail.com',
+              registeredBuildingId: 'sunrise-apts',
+              approvalStatus: 'approved',
+              points: 80,
+              badges: []
+            };
+            await setDoc(userRef, defaultProfile);
+            setCurrentUserProfile(defaultProfile);
+          } else if (sessionUserId === 'u-demo-aarav') {
+            const defaultProfile: UserProfile = {
+              id: 'u-demo-aarav',
+              name: 'Aarav Mehta',
+              email: 'aarav.mehta@gmail.com',
+              registeredBuildingId: 'sunrise-apts',
+              approvalStatus: 'approved',
+              points: 285,
+              badges: ['sentinel']
+            };
+            await setDoc(userRef, defaultProfile);
+            setCurrentUserProfile(defaultProfile);
+          } else if (sessionUserId === 'u-demo-amit') {
+            const defaultProfile: UserProfile = {
+              id: 'u-demo-amit',
+              name: 'Amit Patel',
+              email: 'amit.patel@gmail.com',
+              registeredBuildingId: 'sunrise-apts',
+              approvalStatus: 'approved',
+              points: 320,
+              badges: ['vanguard'],
+              role: 'manager',
+              isCoManager: true
+            };
+            await setDoc(userRef, defaultProfile);
+            setCurrentUserProfile(defaultProfile);
           } else {
             // New custom google signup user
             const shellProfile: UserProfile = {
@@ -380,8 +418,8 @@ export default function App() {
       let bldId = selectedOnboardBuilding;
       if (selectedPlace) {
         bldId = selectedPlace.place_id || 'custom-' + Date.now().toString();
-        // Register building in Firestore if not public
-        if (bldId !== 'public') {
+        // Register building in Firestore if not public and not seeded demo buildings
+        if (bldId !== 'public' && bldId !== 'sunrise-apts' && bldId !== 'greenview-soc') {
           const bldRef = doc(db, 'buildings', bldId);
           await setDoc(bldRef, {
             id: bldId,
@@ -775,36 +813,85 @@ export default function App() {
             <span className="relative bg-white px-3 text-[10px] font-bold text-slate-400 uppercase">Demo Accounts (Test Mode)</span>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {/* Quick Demo Profiles */}
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">🌅 Sunrise Apts Residents</div>
+            
             <button
               onClick={() => handleDemoLogin('u-demo', 'Russel Gandhi', 'russelgandhi@gmail.com', 'sunrise-apts', 'approved', 'citizen')}
-              className="w-full flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+              className="w-full flex items-center gap-3 p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
               id="google-login-demo-citizen"
             >
-              <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+              <div className="w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                 RG
               </div>
               <div className="flex-grow">
-                <span className="text-xs font-black text-slate-800 block">Russel Gandhi (Resident)</span>
-                <span className="text-[10px] text-slate-400 font-semibold block">russelgandhi@gmail.com • Sunrise Apartments</span>
+                <span className="text-[11px] font-black text-slate-800 block">Russel Gandhi</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">russelgandhi@gmail.com • 150 XP</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
             <button
+              onClick={() => handleDemoLogin('u-demo-priya', 'Priya Sharma', 'priya.sharma@gmail.com', 'sunrise-apts', 'approved', 'citizen')}
+              className="w-full flex items-center gap-3 p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+              id="google-login-demo-priya"
+            >
+              <div className="w-7 h-7 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                PS
+              </div>
+              <div className="flex-grow">
+                <span className="text-[11px] font-black text-slate-800 block">Priya Sharma</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">priya.sharma@gmail.com • 80 XP</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            <button
+              onClick={() => handleDemoLogin('u-demo-aarav', 'Aarav Mehta', 'aarav.mehta@gmail.com', 'sunrise-apts', 'approved', 'citizen')}
+              className="w-full flex items-center gap-3 p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+              id="google-login-demo-aarav"
+            >
+              <div className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                AM
+              </div>
+              <div className="flex-grow">
+                <span className="text-[11px] font-black text-slate-800 block">Aarav Mehta</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">aarav.mehta@gmail.com • 285 XP</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-2.5 mb-1">🛠️ Sunrise Managers / Admins</div>
+
+            <button
               onClick={() => handleDemoLogin('u-mgr-sunrise', 'Vikram Sharma', 'sunrise.manager@gmail.com', 'sunrise-apts', 'approved', 'manager')}
-              className="w-full flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+              className="w-full flex items-center gap-3 p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
               id="google-login-demo-manager"
             >
-              <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
+              <div className="w-7 h-7 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                 VS
               </div>
               <div className="flex-grow">
-                <span className="text-xs font-black text-slate-800 block">Vikram Sharma (Admin / Manager)</span>
-                <span className="text-[10px] text-slate-400 font-semibold block">sunrise.manager@gmail.com • Manage Sunrise</span>
+                <span className="text-[11px] font-black text-slate-800 block">Vikram Sharma (Primary Manager)</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">sunrise.manager@gmail.com</span>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            <button
+              onClick={() => handleDemoLogin('u-demo-amit', 'Amit Patel', 'amit.patel@gmail.com', 'sunrise-apts', 'approved', 'manager')}
+              className="w-full flex items-center gap-3 p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+              id="google-login-demo-amit"
+            >
+              <div className="w-7 h-7 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                AP
+              </div>
+              <div className="flex-grow">
+                <span className="text-[11px] font-black text-slate-800 block">Amit Patel (Co-Manager)</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">amit.patel@gmail.com</span>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
         </div>
@@ -824,11 +911,63 @@ export default function App() {
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Find Your Property</label>
-            <BuildingAutocomplete onPlaceSelected={(place) => {
-              setSelectedPlace(place);
-              setSelectedOnboardBuilding('');
-            }} />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Find Your Property</label>
+              <BuildingAutocomplete onPlaceSelected={(place) => {
+                setSelectedPlace(place);
+                setSelectedOnboardBuilding('');
+              }} />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Popular Demo Properties (Managed)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlace({
+                      name: 'Sunrise Apartments',
+                      address: 'Block A, Sector 62, Noida, Uttar Pradesh 201301',
+                      lat: 28.6280,
+                      lng: 77.3731,
+                      place_id: 'sunrise-apts'
+                    });
+                    setSelectedOnboardBuilding('');
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    selectedPlace?.place_id === 'sunrise-apts'
+                      ? 'border-orange-500 bg-orange-50/50 ring-2 ring-orange-500/20'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                  }`}
+                  id="onboard-demo-sunrise"
+                >
+                  <span className="text-xs font-black text-slate-800 block">🌅 Sunrise Apts</span>
+                  <span className="text-[9px] text-slate-500 mt-0.5 block line-clamp-1">Sector 62, Noida</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlace({
+                      name: 'Greenview Society',
+                      address: 'Street 45, Gachibowli, Hyderabad, Telangana 500032',
+                      lat: 17.4483,
+                      lng: 78.3741,
+                      place_id: 'greenview-soc'
+                    });
+                    setSelectedOnboardBuilding('');
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    selectedPlace?.place_id === 'greenview-soc'
+                      ? 'border-orange-500 bg-orange-50/50 ring-2 ring-orange-500/20'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                  }`}
+                  id="onboard-demo-greenview"
+                >
+                  <span className="text-xs font-black text-slate-800 block">🌳 Greenview Soc</span>
+                  <span className="text-[9px] text-slate-500 mt-0.5 block line-clamp-1">Gachibowli, Hyd</span>
+                </button>
+              </div>
+            </div>
             
             {selectedPlace && (
               <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">

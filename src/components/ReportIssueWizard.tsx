@@ -595,9 +595,9 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         lng: evidenceMetadata?.lng ?? null,
         imageHash: imageHash ?? null,
         possibleReusedImage: possibleReusedImage ?? false,
-        voiceDescriptionUrl: descriptionMode === 'voice' ? voiceAudio : undefined,
-        voiceOriginalTranscription: descriptionMode === 'voice' ? voiceOriginalTranscription : undefined,
-        voiceEnglishTranslation: descriptionMode === 'voice' ? voiceEnglishTranslation : undefined
+        voiceDescriptionUrl: (descriptionMode === 'voice' && voiceAudio) ? voiceAudio : null,
+        voiceOriginalTranscription: (descriptionMode === 'voice' && voiceOriginalTranscription) ? voiceOriginalTranscription : null,
+        voiceEnglishTranslation: (descriptionMode === 'voice' && voiceEnglishTranslation) ? voiceEnglishTranslation : null
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {

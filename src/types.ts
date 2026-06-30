@@ -9,6 +9,8 @@ export interface UserProfile {
   badges: string[];
   strikes?: number;
   flaggedForReview?: boolean;
+  role?: 'citizen' | 'manager';
+  isCoManager?: boolean;
 }
 
 export interface Building {

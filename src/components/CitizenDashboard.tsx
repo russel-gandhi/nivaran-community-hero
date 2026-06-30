@@ -15,12 +15,17 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'photo' | 'video' | 'audio'; title: string; description: string } | null>(null);
   const [confirmRetractId, setConfirmRetractId] = useState<string | null>(null);
 
-  // Filter current user's active reports
-  const myReports = reports.filter(r => r.reporterId === currentUserProfile?.id && r.status !== 'resolved' && r.status !== 'retracted');
+  // Filter current user's active reports (using ID and email fallback for robust matching)
+  const myReports = reports.filter(r => 
+    (r.reporterId === currentUserProfile?.id || (currentUserProfile?.email && r.reporterEmail === currentUserProfile?.email)) && 
+    r.status !== 'resolved' && 
+    r.status !== 'retracted'
+  );
 
   // Filter nearby active reports
   const nearbyReports = reports.filter(r => {
-    if (r.reporterId === currentUserProfile?.id) return false;
+    const isMyReport = r.reporterId === currentUserProfile?.id || (currentUserProfile?.email && r.reporterEmail === currentUserProfile?.email);
+    if (isMyReport) return false;
     if (r.status === 'resolved' || r.status === 'retracted') return false;
 
     if (r.tier === 'public') return true;
@@ -30,16 +35,43 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
   });
 
   // History reports for current user
-  const historyPrivateBuilding = reports.filter(r => 
-    (r.status === 'resolved' || (r.status === 'retracted' && r.reporterId === currentUserProfile?.id)) && 
-    (r.tier === 'flat' || r.tier === 'common_area') && 
-    (r.reporterId === currentUserProfile?.id || r.buildingId === currentUserProfile?.registeredBuildingId)
-  );
+  const historyPrivateBuilding = reports.filter(r => {
+    const isMyReport = r.reporterId === currentUserProfile?.id || (currentUserProfile?.email && r.reporterEmail === currentUserProfile?.email);
+    const isRetracted = r.status === 'retracted';
+    const isResolved = r.status === 'resolved';
+
+    // retracted reports should only show in history if they belong to the current user
+    if (isRetracted && !isMyReport) return false;
+
+    // must be either resolved or retracted
+    if (!isResolved && !isRetracted) return false;
+
+    // tier check
+    if (r.tier === 'flat') {
+      // flat tier is private home issue: ONLY show if it belongs to current user
+      return isMyReport;
+    } else if (r.tier === 'common_area') {
+      // common area tier is building level issue: show if in the user's building
+      return r.buildingId === currentUserProfile?.registeredBuildingId;
+    }
+
+    return false;
+  });
   
-  const historyPublic = reports.filter(r => 
-    (r.status === 'resolved' || (r.status === 'retracted' && r.reporterId === currentUserProfile?.id)) && 
-    r.tier === 'public'
-  );
+  const historyPublic = reports.filter(r => {
+    const isMyReport = r.reporterId === currentUserProfile?.id || (currentUserProfile?.email && r.reporterEmail === currentUserProfile?.email);
+    const isRetracted = r.status === 'retracted';
+    const isResolved = r.status === 'resolved';
+
+    // retracted reports should only show in history if they belong to the current user
+    if (isRetracted && !isMyReport) return false;
+
+    // must be either resolved or retracted
+    if (!isResolved && !isRetracted) return false;
+
+    // public tier check
+    return r.tier === 'public';
+  });
 
   const getSeverityBadgeColor = (sev: number) => {
     if (sev >= 5) return 'bg-red-50 text-red-700 border-red-100';
@@ -422,7 +454,7 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                         {getStatusBadge(report.status)}
                       </div>
                       
-                      {report.reporterId === currentUserProfile?.id && report.status !== 'retracted' && (
+                      {(report.reporterId === currentUserProfile?.id || (currentUserProfile?.email && report.reporterEmail === currentUserProfile?.email)) && report.status !== 'retracted' && (
                         <div className="flex justify-end pt-1">
                           {confirmRetractId === report.id ? (
                             <div className="flex items-center gap-2">
@@ -489,7 +521,7 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                         {getStatusBadge(report.status)}
                       </div>
                       
-                      {report.reporterId === currentUserProfile?.id && report.status !== 'retracted' && (
+                      {(report.reporterId === currentUserProfile?.id || (currentUserProfile?.email && report.reporterEmail === currentUserProfile?.email)) && report.status !== 'retracted' && (
                         <div className="flex justify-end pt-1">
                           {confirmRetractId === report.id ? (
                             <div className="flex items-center gap-2">
