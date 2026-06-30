@@ -87,6 +87,7 @@ export interface Report {
   voiceDescriptionUrl?: string; // base64 representation of original voice note
   voiceOriginalTranscription?: string; // native language transcription
   voiceEnglishTranslation?: string; // original translated English description
+  verificationTrace?: any[];
 }
 
 export interface RoutingLog {

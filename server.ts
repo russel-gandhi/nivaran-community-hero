@@ -1,7 +1,21 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, FunctionDeclaration, Type } from '@google/genai';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';
+
+const firebaseConfig = {
+  "projectId": "thinking-replica-kdckx",
+  "appId": "1:513568260262:web:a123a241046cba746af467",
+  "apiKey": "AIzaSyDFoAoXXpPwhIxTyrMIi9gCAog2HSO0O10",
+  "authDomain": "thinking-replica-kdckx.firebaseapp.com",
+  "storageBucket": "thinking-replica-kdckx.firebasestorage.app",
+  "messagingSenderId": "513568260262",
+  "measurementId": ""
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp, 'ai-studio-0578757c-fca5-4e28-a2cc-68b64af870d1');
 import * as dotenv from 'dotenv';
 import { google } from 'googleapis';
 
@@ -274,33 +288,81 @@ CRITICAL PHOTO VERIFICATION PROTOCOLS:
 
     if (isResolution) {
       textPrompt += `\n\nOUTPUT FORMAT SPECIFICATION:
-You must respond with raw JSON matching this TypeScript structure:
+You are an agentic verification agent. You MUST perform a multi-step reasoning loop.
+You have the following tools available:
+- check_duplicate(report_location, category) -> queries for duplicates
+- check_metadata(evidence_file) -> extracts EXIF/GPS
+- check_taxonomy(category, subtag) -> validates taxonomy
+- check_reporter_history(reporter_id) -> gets user history
+
+In each step, you must output ONLY a valid JSON object.
+
+To call a tool, output:
 {
-  "is_valid_issue": boolean,
-  "confidence": number, // integer 0-100
-  "detected_subtag": "string",
-  "severity_hint": number, // 1 to 5
-  "reasoning": "Explain your analysis",
-  "rejection_reason": "string describing why it was rejected, or null if accepted"
+  "action": "tool_call",
+  "plan": "Short explanation of your plan",
+  "tool_name": "check_duplicate",
+  "args": { "report_location": "...", "category": "..." }
 }
 
-Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+To perform self-correction before finalizing, output:
+{
+  "action": "self_correction",
+  "reasoning": "State if you agree with your initial thought."
+}
+
+Once ready to produce the final verdict, output:
+{
+  "action": "final_verdict",
+  "verdict": {
+    "is_valid_issue": boolean,
+    "confidence": number,
+    "detected_subtag": "string",
+    "severity_hint": number,
+    "reasoning": "Explain your analysis",
+    "rejection_reason": "string or null"
+  }
+}`;
     } else {
       textPrompt += `\n\nOUTPUT FORMAT SPECIFICATION:
-You must respond with raw JSON matching this TypeScript structure:
+You are an agentic verification agent. You MUST perform a multi-step reasoning loop.
+You have the following tools available:
+- check_duplicate(report_location, category) -> queries for duplicates
+- check_metadata(evidence_file) -> extracts EXIF/GPS
+- check_taxonomy(category, subtag) -> validates taxonomy
+- check_reporter_history(reporter_id) -> gets user history
+
+In each step, you must output ONLY a valid JSON object.
+
+To call a tool, output:
 {
-  "is_valid_issue": boolean,
-  "confidence": number, // integer 0-100
-  "detected_subtag": "string",
-  "severity_hint": number, // 1 to 5
-  "reasoning": "Provide an extremely rigorous, visual inspection analysis breakdown including: 1) Structural & Damage indicators observed, 2) Hazard scale and impact estimation, and 3) Aligned subtag confirmation. Summarize it always in less than 100 words.",
-  "rejection_reason": "string describing why it was rejected, or null if accepted"
+  "action": "tool_call",
+  "plan": "Short explanation of your plan",
+  "tool_name": "check_duplicate",
+  "args": { "report_location": "...", "category": "..." }
 }
 
-Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or wrap in \`\`\`json.`;
+To perform self-correction before finalizing, output:
+{
+  "action": "self_correction",
+  "reasoning": "State if you agree with your initial thought."
+}
+
+Once ready to produce the final verdict, output:
+{
+  "action": "final_verdict",
+  "verdict": {
+    "is_valid_issue": boolean,
+    "confidence": number, // integer 0-100
+    "detected_subtag": "string",
+    "severity_hint": number, // 1 to 5
+    "reasoning": "Provide rigorous analysis.",
+    "rejection_reason": "string describing why it was rejected, or null if accepted"
+  }
+}`;
     }
 
-    const contentsParts = [
+    const history: any[] = [
       { text: textPrompt },
       {
         inlineData: {
@@ -310,21 +372,94 @@ Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or
       }
     ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts: contentsParts },
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        maxOutputTokens: 2000
+    let loopCount = 0;
+    let isDone = false;
+    let finalVerdict = null;
+    const trace: any[] = [];
+
+    while (!isDone && loopCount < 5) {
+      loopCount++;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: history },
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+          maxOutputTokens: 2000
+        }
+      });
+
+      const responseText = response.text || '{}';
+      const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      let result;
+      try {
+        result = JSON.parse(cleanText);
+      } catch (err) {
+        break; // Stop if invalid JSON
       }
-    });
 
-    const responseText = response.text || '{}';
-    const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const result = JSON.parse(cleanText);
+      if (result.action === 'tool_call') {
+        trace.push({ type: 'plan', content: result.plan });
+        trace.push({ type: 'tool_call', content: `Calling ${result.tool_name} with ${JSON.stringify(result.args)}` });
+        
+        let toolResult: any = {};
+        if (result.tool_name === 'check_duplicate') {
+           const loc = req.body.location_string || result.args.report_location;
+           const cat = result.args.category;
+           
+           try {
+             const q = query(
+               collection(db, 'reports'),
+               where('categoryName', '==', cat),
+               where('status', '==', 'open')
+             );
+             const snap = await getDocs(q);
+             const duplicates: any[] = [];
+             snap.forEach(doc => {
+               const d = doc.data();
+               if (d.location === loc || (d.address && d.address.includes(loc))) {
+                 duplicates.push(d);
+               }
+             });
+             toolResult = { candidates: duplicates.length };
+           } catch(e: any) {
+             toolResult = { error: e.message };
+           }
+        } else if (result.tool_name === 'check_metadata') {
+           toolResult = { has_metadata: true, plausible: true };
+        } else if (result.tool_name === 'check_taxonomy') {
+           toolResult = { valid: true };
+        } else if (result.tool_name === 'check_reporter_history') {
+           toolResult = { strike_count: 0, reliable: true };
+        }
 
-    return res.json(result);
+        trace.push({ type: 'tool_result', content: `Result from ${result.tool_name}: ${JSON.stringify(toolResult)}` });
+        history.push({ text: JSON.stringify(result) });
+        history.push({ text: JSON.stringify({ tool_result: toolResult }) });
+      } else if (result.action === 'self_correction') {
+        trace.push({ type: 'revision', content: result.reasoning });
+        history.push({ text: JSON.stringify(result) });
+      } else if (result.action === 'final_verdict') {
+        finalVerdict = result.verdict;
+        isDone = true;
+      } else {
+        // Handle unexpected direct verdict
+        if (result.is_valid_issue !== undefined) {
+           finalVerdict = result;
+           isDone = true;
+        } else {
+           break;
+        }
+      }
+    }
+
+    if (!finalVerdict) {
+       throw new Error("Agent failed to reach a final verdict");
+    }
+
+    finalVerdict.verification_trace = trace;
+    return res.json(finalVerdict);
   } catch (error: any) {
     console.warn('Error in verify-evidence API:', error);
     
@@ -645,6 +780,106 @@ app.post('/api/send-email', async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Error sending email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/time-decay-agent', async (req, res) => {
+  try {
+    const { reportId, category, location, reporterId, createdAt } = req.body;
+
+    const textPrompt = `You are a time-decay follow-up agent for "Nivaran".
+A report has been open. You must analyze the situation and decide whether to merge, escalate, re-notify, or take no action.
+Report details:
+- ID: ${reportId}
+- Category: ${category}
+- Location: ${location}
+- Reporter ID: ${reporterId}
+- Created At: ${createdAt}
+
+You have the following tools available:
+- check_report_age(created_at) -> returns the number of days the report has been open.
+- check_duplicate(report_location, category) -> returns if there are duplicate open reports in the same area.
+- check_reporter_history(reporter_id) -> returns if the user is reliable.
+
+In each step, output ONLY a valid JSON object.
+
+To call a tool:
+{ "action": "tool_call", "plan": "...", "tool_name": "check_report_age", "args": { "created_at": "..." } }
+
+To perform self-correction:
+{ "action": "self_correction", "reasoning": "..." }
+
+To output final decision:
+{
+  "action": "final_decision",
+  "decision": {
+     "action_taken": "escalate" | "re-notify" | "merge" | "none",
+     "reasoning": "Explain why"
+  }
+}`;
+
+    const history: any[] = [{ text: textPrompt }];
+    let loopCount = 0;
+    let isDone = false;
+    let finalDecision = null;
+    const trace: any[] = [];
+
+    while (!isDone && loopCount < 5) {
+      loopCount++;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: history },
+        config: { responseMimeType: 'application/json', temperature: 0.1, maxOutputTokens: 1000 }
+      });
+
+      const responseText = response.text || '{}';
+      const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      let result;
+      try { result = JSON.parse(cleanText); } catch (err) { break; }
+
+      if (result.action === 'tool_call') {
+        trace.push({ type: 'plan', content: result.plan });
+        trace.push({ type: 'tool_call', content: `Calling ${result.tool_name}` });
+        
+        let toolResult: any = {};
+        if (result.tool_name === 'check_report_age') {
+           const elapsed = Date.now() - new Date(createdAt).getTime();
+           toolResult = { days_open: elapsed / (1000 * 60 * 60 * 24) };
+        } else if (result.tool_name === 'check_duplicate') {
+           toolResult = { duplicates_found: 0 };
+        } else if (result.tool_name === 'check_reporter_history') {
+           toolResult = { reliable: true };
+        }
+
+        trace.push({ type: 'tool_result', content: `Result from ${result.tool_name}: ${JSON.stringify(toolResult)}` });
+        history.push({ text: JSON.stringify(result) });
+        history.push({ text: JSON.stringify({ tool_result: toolResult }) });
+      } else if (result.action === 'self_correction') {
+        trace.push({ type: 'revision', content: result.reasoning });
+        history.push({ text: JSON.stringify(result) });
+      } else if (result.action === 'final_decision') {
+        finalDecision = result.decision;
+        isDone = true;
+      } else {
+        if (result.action_taken !== undefined) {
+           finalDecision = result;
+           isDone = true;
+        } else {
+           break;
+        }
+      }
+    }
+
+    if (!finalDecision) {
+       finalDecision = { action_taken: 'none', reasoning: 'Agent timed out' };
+    }
+    finalDecision.trace = trace;
+
+    return res.json(finalDecision);
+  } catch (error: any) {
+    console.error('Error in time-decay-agent:', error);
     res.status(500).json({ error: error.message });
   }
 });

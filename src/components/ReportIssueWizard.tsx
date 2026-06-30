@@ -91,6 +91,7 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
     severity_hint?: number;
     reasoning?: string;
     rejection_reason?: string;
+    verification_trace?: any[];
   } | null>(null);
   const [rejectionsCount, setRejectionsCount] = useState(0);
   const [dedupedReport, setDedupedReport] = useState<Report | null>(null);
@@ -375,6 +376,11 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
     setLoading(true);
 
     try {
+      let location_string = '';
+      if (selectedTier === 'flat') location_string = flatNumber;
+      else if (selectedTier === 'common_area') location_string = commonAreaLocation;
+      else if (selectedTier === 'public') location_string = publicLocation;
+
       const response = await fetch('/api/verify-evidence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -383,7 +389,10 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
           subtag: selectedCategory?.subtag,
           description: description,
           evidenceUrl: evidenceUrl,
-          evidenceType: evidenceType
+          evidenceType: evidenceType,
+          reporterId: currentUserProfile?.id,
+          tier: selectedTier,
+          location_string: location_string
         })
       });
       
@@ -598,7 +607,8 @@ export default function ReportIssueWizard({ currentUserProfile, onIssueReported,
         possibleReusedImage: possibleReusedImage ?? false,
         voiceDescriptionUrl: (descriptionMode === 'voice' && voiceAudio) ? voiceAudio : null,
         voiceOriginalTranscription: (descriptionMode === 'voice' && voiceOriginalTranscription) ? voiceOriginalTranscription : null,
-        voiceEnglishTranslation: (descriptionMode === 'voice' && voiceEnglishTranslation) ? voiceEnglishTranslation : null
+        voiceEnglishTranslation: (descriptionMode === 'voice' && voiceEnglishTranslation) ? voiceEnglishTranslation : null,
+        verificationTrace: verificationResult?.verification_trace || null
       };
 
       if (selectedTier !== 'public' && selectedBuildingId) {

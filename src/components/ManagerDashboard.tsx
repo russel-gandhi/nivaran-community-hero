@@ -340,13 +340,23 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                 </button>
                 <button
                   onClick={async () => {
-                    const now = Date.now();
                     let sentCount = 0;
                     for (const r of reports) {
                       if (r.status === 'open' || r.status === 'in_progress') {
-                        const elapsed = now - new Date(r.createdAt).getTime();
-                        const days = elapsed / (1000 * 60 * 60 * 24);
-                        if (days >= 5 && accessToken && r.reporterEmail) {
+                        const res = await fetch('/api/time-decay-agent', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            reportId: r.id,
+                            category: r.categoryName,
+                            location: r.address || r.location || '',
+                            reporterId: r.reporterId,
+                            createdAt: r.createdAt
+                          })
+                        });
+                        const result = await res.json();
+                        
+                        if (result.action_taken === 're-notify' && accessToken && r.reporterEmail) {
                           const actionUrl = `${window.location.origin}/?verify=${r.id}`;
                           await fetch('/api/send-email', {
                             method: 'POST',
@@ -365,7 +375,7 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                         }
                       }
                     }
-                    alert(`Sent ${sentCount} time-decay follow-up emails.`);
+                    alert(`Time-decay agent finished. Sent ${sentCount} follow-up emails.`);
                   }}
                   className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md"
                 >
@@ -506,6 +516,32 @@ export default function ManagerDashboard({ currentBuildingId, onBuildingChanged,
                           <audio src={report.voiceDescriptionUrl} controls className="w-full h-7 mt-1 rounded" />
                         </div>
                       )}
+
+                      {report.verificationTrace && report.verificationTrace.length > 0 ? (
+                        <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-[10px] text-slate-500 flex flex-col gap-1.5 mt-2">
+                          <div className="flex items-center gap-1.5 mb-1 text-orange-600 font-bold">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>AI Reasoning Trace:</span>
+                          </div>
+                          {report.verificationTrace.map((step: any, idx: number) => (
+                            <div key={idx} className="flex gap-1.5">
+                              <span className="shrink-0 text-slate-400 font-mono">[{step.type}]</span>
+                              <span className="italic">{step.content}</span>
+                            </div>
+                          ))}
+                          <div className="flex gap-1.5 mt-1 border-t border-slate-200 pt-1">
+                            <span className="shrink-0 font-bold text-slate-600">[final]</span>
+                            <span className="italic">"{report.reasoning}"</span>
+                          </div>
+                        </div>
+                      ) : report.reasoning ? (
+                        <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-[10px] text-slate-500 flex gap-1.5 mt-2">
+                          <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+                          <p className="italic">
+                            <strong>AI Dispatch Note:</strong> "{report.reasoning}"
+                          </p>
+                        </div>
+                      ) : null}
 
                       <p className="text-[10px] text-slate-400 font-bold">
                         By Resident: {report.reporterName}

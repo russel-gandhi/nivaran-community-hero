@@ -247,14 +247,31 @@ export default function CitizenDashboard({ reports, currentUserProfile, onOpenRe
                   </div>
                 </div>
 
-                {report.reasoning && (
+                {report.verificationTrace && report.verificationTrace.length > 0 ? (
+                  <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-[10px] text-slate-500 flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5 mb-1 text-orange-600 font-bold">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>AI Reasoning Trace:</span>
+                    </div>
+                    {report.verificationTrace.map((step: any, idx: number) => (
+                      <div key={idx} className="flex gap-1.5">
+                        <span className="shrink-0 text-slate-400 font-mono">[{step.type}]</span>
+                        <span className="italic">{step.content}</span>
+                      </div>
+                    ))}
+                    <div className="flex gap-1.5 mt-1 border-t border-slate-200 pt-1">
+                      <span className="shrink-0 font-bold text-slate-600">[final]</span>
+                      <span className="italic">"{report.reasoning}"</span>
+                    </div>
+                  </div>
+                ) : report.reasoning ? (
                   <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-[10px] text-slate-500 flex gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
                     <p className="italic">
                       <strong>AI Dispatch Note:</strong> "{report.reasoning}"
                     </p>
                   </div>
-                )}
+                ) : null}
                 
                 <div className="flex justify-end pt-1">
                   {confirmRetractId === report.id ? (
