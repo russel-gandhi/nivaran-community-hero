@@ -326,14 +326,21 @@ Ensure you return ONLY the valid raw JSON. Do not include markdown codeblocks or
 
     return res.json(result);
   } catch (error: any) {
-    console.warn('Error in verify-evidence API:', error.message || error);
+    console.warn('Error in verify-evidence API:', error);
+    
+    // Check if it's a rate limit error
+    const isRateLimit = error.message?.includes('Quota exceeded') || error.message?.includes('429');
+    const reasoningMsg = isRateLimit 
+      ? 'Verification bypassed: Google Gemini API free-tier rate limit exceeded. Accepted automatically for demo purposes.' 
+      : 'Server-side verification bypassed due to configuration error, accepted automatically for demo purposes.';
+
     // Return a structured error response with status 200 so the client fail-opens gracefully
     res.status(200).json({
       is_valid_issue: true, // Fail-open for demo if Gemini fails completely
       confidence: 80,
       detected_subtag: req.body.subtag,
       severity_hint: 3,
-      reasoning: 'Server-side verification bypassed due to configuration error, accepted automatically for demo purposes.',
+      reasoning: reasoningMsg,
       rejection_reason: null
     });
   }

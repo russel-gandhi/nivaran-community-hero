@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 const firebaseConfig = {
   "projectId": "thinking-replica-kdckx",
@@ -16,10 +16,19 @@ const db = getFirestore(app, 'ai-studio-0578757c-fca5-4e28-a2cc-68b64af870d1');
 
 async function test() {
   try {
-    const querySnapshot = await getDocs(collection(db, "users"));
-    console.log("Success! Found", querySnapshot.size, "documents");
+    const q = query(
+      collection(db, 'reports'),
+      where('reporterId', '==', 'test'),
+      where('categoryId', '==', 'test'),
+      where('tier', '==', 'test'),
+      where('status', '==', 'open')
+    );
+    const snap = await getDocs(q);
+    console.log("Read Success! Size:", snap.size);
+    process.exit(0);
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Read Error:", err);
+    process.exit(1);
   }
 }
 
